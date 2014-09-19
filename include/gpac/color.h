@@ -1,7 +1,7 @@
 /*
  *			GPAC - Multimedia Framework C SDK
  *
- *			Authors: Jean Le Feuvre 
+ *			Authors: Jean Le Feuvre
  *			Copyright (c) Telecom ParisTech 2000-2012
  *					All rights reserved
  *
@@ -11,15 +11,15 @@
  *  it under the terms of the GNU Lesser General Public License as published by
  *  the Free Software Foundation; either version 2, or (at your option)
  *  any later version.
- *   
+ *
  *  GPAC is distributed in the hope that it will be useful,
  *  but WITHOUT ANY WARRANTY; without even the implied warranty of
  *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  *  GNU Lesser General Public License for more details.
- *   
+ *
  *  You should have received a copy of the GNU Lesser General Public
  *  License along with this library; see the file COPYING.  If not, write to
- *  the Free Software Foundation, 675 Mass Ave, Cambridge, MA 02139, USA. 
+ *  the Free Software Foundation, 675 Mass Ave, Cambridge, MA 02139, USA.
  *
  */
 
@@ -56,10 +56,10 @@ typedef struct
 	u32 width;
 	/*!Height of the video framebuffer */
 	u32 height;
-	/*!Horizontal pitch of the video framebuffer (number of bytes to skip to go to next (right) pixel in the buffer). May be 
+	/*!Horizontal pitch of the video framebuffer (number of bytes to skip to go to next (right) pixel in the buffer). May be
 	negative for some framebuffers (embedded devices). 0 means linear frame buffer (pitch_x==bytes per pixel)*/
 	s32 pitch_x;
-	/*!Vertical pitch of the video framebuffer (number of bytes to skip to go down one line in the buffer). May be 
+	/*!Vertical pitch of the video framebuffer (number of bytes to skip to go down one line in the buffer). May be
 	negative for some framebuffers (embedded devices)*/
 	s32 pitch_y;
 	/*!Pixel format of the video framebuffer*/
@@ -144,14 +144,26 @@ typedef u32 GF_Color;
 /*!\hideinitializer transfoms a 32-bits color into a 15-bits one.\note alpha component is lost*/
 #define GF_COL_TO_444(c) (((GF_COL_R(c) & 240)<<4) + ((GF_COL_G(c) & 240))  + ((GF_COL_B(c)>>4) & 240) )
 
+/*!Parses color from HTML name or hexa representation
+ *\param name name of the color to parse
+ *\return @GF_Color value with alpha set to 0xFF if successfull, 0 otherwise
+*/
+GF_Color gf_color_parse(const char *name);
+
+/*!Gets color from HTML name or hexa representation
+ *\param col color to identify
+ *\return name of the color if successfull, NULL otherwise
+*/
+const char *gf_color_get_name(GF_Color col);
+
 /*!Inits a color matrix to identity*/
 void gf_cmx_init(GF_ColorMatrix *_this);
-/*!Inits all coefficients of a color matrix 
+/*!Inits all coefficients of a color matrix
  *\param _this color matrix to initialize
  *\param coefs list of the 20 fixed numbers to copy
 */
 void gf_cmx_set_all(GF_ColorMatrix *_this, Fixed *coefs);
-/*!Inits all coefficients of a color matrix 
+/*!Inits all coefficients of a color matrix
  *\param _this color matrix to initialize
  *\param mrr red-to-red multiplication factor
  *\param mrg red-to-green multiplication factor
@@ -174,11 +186,11 @@ void gf_cmx_set_all(GF_ColorMatrix *_this, Fixed *coefs);
  *\param maa alpha-to-alpha multiplication factor
  *\param ta alpha translation factor
 */
-void gf_cmx_set(GF_ColorMatrix *_this, 
-				 Fixed mrr, Fixed mrg, Fixed mrb, Fixed mra, Fixed tr,
-				 Fixed mgr, Fixed mgg, Fixed mgb, Fixed mga, Fixed tg,
-				 Fixed mbr, Fixed mbg, Fixed mbb, Fixed mba, Fixed tb,
-				 Fixed mar, Fixed mag, Fixed mab, Fixed maa, Fixed ta);
+void gf_cmx_set(GF_ColorMatrix *_this,
+                Fixed mrr, Fixed mrg, Fixed mrb, Fixed mra, Fixed tr,
+                Fixed mgr, Fixed mgg, Fixed mgb, Fixed mga, Fixed tg,
+                Fixed mbr, Fixed mbg, Fixed mbb, Fixed mba, Fixed tb,
+                Fixed mar, Fixed mag, Fixed mab, Fixed maa, Fixed ta);
 /*!Inits a matrix from another matrix
  *\param _this color matrix to initialize
  *\param from color matrix to copy from
@@ -227,12 +239,37 @@ typedef struct
 	u8 high;
 } GF_ColorKey;
 
-/*!\brief not done yet
+/*!\brief stretches two video surfaces
  *
+ * Software stretch of source surface ont destination surface.
+ *\param dst destination surface
+ *\param src source surface
+ *\param dst_wnd destination rectangle. If null the entire destination surface is used
+ *\param src_wnd source rectangle. If null the entire source surface is used
+ *\param alpha blend factor of source over alpha
+ *\param flip flips the source
+ *\param colorKey makes source pixel matching the color key transparent
+ *\param cmat applies color matrix to the source
+ *\return error code if any
  */
 GF_Err gf_stretch_bits(GF_VideoSurface *dst, GF_VideoSurface *src, GF_Window *dst_wnd, GF_Window *src_wnd, u8 alpha, Bool flip, GF_ColorKey *colorKey, GF_ColorMatrix * cmat);
 
 
+
+/*!\brief copies YUV 420 10 bits to YUV destination (only YUV420 8 bits supported)
+ *
+ * Software stretch of source surface ont destination surface.
+ *\param vs_dst destination surface
+ *\param pY source Y plane
+ *\param pU source U plane. if NULL, the U plane is located after the Y plane
+ *\param pV source V plane. if NULL, the V plane is located after the U plane
+ *\param src_stride source stride in bytes
+ *\param src_width source width in pixels
+ *\param src_height source height in pixels
+ *\param src_wnd source rectangle. If null the entire source surface is used
+ *\return error code if any
+ */
+GF_Err gf_color_write_yv12_10_to_yuv(GF_VideoSurface *vs_dst,  unsigned char *pY, unsigned char *pU, unsigned char*pV, u32 src_stride, u32 src_width, u32 src_height, const GF_Window *src_wnd, Bool swap_uv);
 
 /*! @} */
 

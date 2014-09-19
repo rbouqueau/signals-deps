@@ -1,7 +1,7 @@
 /*
  *			GPAC - Multimedia Framework C SDK
  *
- *			Authors: Jean Le Feuvre 
+ *			Authors: Jean Le Feuvre
  *			Copyright (c) Telecom ParisTech 2000-2012
  *					All rights reserved
  *
@@ -11,15 +11,15 @@
  *  it under the terms of the GNU Lesser General Public License as published by
  *  the Free Software Foundation; either version 2, or (at your option)
  *  any later version.
- *   
+ *
  *  GPAC is distributed in the hope that it will be useful,
  *  but WITHOUT ANY WARRANTY; without even the implied warranty of
  *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  *  GNU Lesser General Public License for more details.
- *   
+ *
  *  You should have received a copy of the GNU Lesser General Public
  *  License along with this library; see the file COPYING.  If not, write to
- *  the Free Software Foundation, 675 Mass Ave, Cambridge, MA 02139, USA. 
+ *  the Free Software Foundation, 675 Mass Ave, Cambridge, MA 02139, USA.
  *
  */
 
@@ -35,26 +35,26 @@ extern "C" {
  *	\brief tokenizer functions.
  */
 
- /*!
- *	\addtogroup tok_grp tokenizer
- *	\ingroup utils_grp
- *	\brief String Tokenizer Functions
- *
- *This section documents the basic string tokenizer of the GPAC framework.
- *	@{
- */
+/*!
+*	\addtogroup tok_grp tokenizer
+*	\ingroup utils_grp
+*	\brief String Tokenizer Functions
+*
+*This section documents the basic string tokenizer of the GPAC framework.
+*	@{
+*/
 
 #include <gpac/tools.h>
 
 /*!
- *\brief get string component 
+ *\brief get string component
  *
  *Gets the next string component comprised in a given set of characters
- *\param buffer source string to scan
- *\param start char offset from begining of buffer where tokenization shall start
- *\param separators separator characters to use
- *\param token output buffer location
- *\param token_size output buffer allocated size
+ *\param Buffer source string to scan
+ *\param Start char offset from begining of buffer where tokenization shall start
+ *\param Separator separator characters to use
+ *\param Container output buffer location
+ *\param ContainerSize output buffer allocated size
  *\return position of the first char in the buffer after the last terminating separator, or -1 if token could not be found
  */
 s32 gf_token_get(const char* Buffer, s32 Start, const char* Separator, char* Container, s32 ContainerSize);
@@ -62,12 +62,12 @@ s32 gf_token_get(const char* Buffer, s32 Start, const char* Separator, char* Con
  *\brief get string component without delimitting characters
  *
  *Gets the next string component comprised in a given set of characters, removing surrounding characters
- *\param buffer source string to scan
- *\param start char offset from begining of buffer where tokenization shall start
- *\param separators separator characters to use
+ *\param Buffer source string to scan
+ *\param Start char offset from begining of buffer where tokenization shall start
+ *\param Separator separator characters to use
  *\param strip_set surrounding characters to remove
- *\param token output buffer location
- *\param token_size output buffer allocated size
+ *\param Container output buffer location
+ *\param ContainerSize output buffer allocated size
  *\return position of the first char in the buffer after the last terminating separator, or -1 if token could not be found
  */
 s32 gf_token_get_strip(const char* Buffer, s32 Start, const char* Separator, const char* strip_set, char* Container, s32 ContainerSize);
@@ -87,10 +87,10 @@ s32 gf_token_get_line(const char *buffer, u32 start, u32 size, char *line_buffer
  *\brief pattern location
  *
  *Locates a pattern in the buffer
- *\param buffer source string to scan
- *\param start char offset from begining of buffer where tokenization shall start
- *\param size size of the input buffer to analyze
- *\param pattern pattern to locate
+ *\param Buffer source string to scan
+ *\param Start char offset from begining of buffer where tokenization shall start
+ *\param Size size of the input buffer to analyze
+ *\param Pattern pattern to locate
  *\return position of the first char in the buffer after the pattern, or -1 if pattern could not be found
  */
 s32 gf_token_find(const char* Buffer, u32 Start, u32 Size, const char* Pattern);

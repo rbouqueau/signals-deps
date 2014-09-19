@@ -1,7 +1,7 @@
 /*
  *			GPAC - Multimedia Framework C SDK
  *
- *			Authors: Jean Le Feuvre 
+ *			Authors: Jean Le Feuvre
  *			Copyright (c) Telecom ParisTech 2000-2012
  *					All rights reserved
  *
@@ -110,6 +110,9 @@ typedef struct
 			if not supported, mix of 2D (raster) and 3D (openGL) will be disabled
 	*/
 	u32 opengl_mode;
+
+	// resources must be resetup before next render step (this is mainly due to discard all openGL textures and cached objects) - inly used when sent from plugin to term
+	Bool hw_reset;
 } GF_EventVideoSetup;
 
 /*event proc return value: ignored
@@ -220,6 +223,15 @@ typedef struct
 	Bool is_connected;
 } GF_EventConnect;
 
+/*event proc return value: 1 to indicate the terminal should attempt a default layout for this addon, 0: nothing will be done*/
+typedef struct
+{
+	/*GF_EVENT_ADDON_DETECTED*/
+	u8 type;
+	const char *addon_url;
+	const char *mime_type;
+} GF_EventAddonConnect;
+
 /*event proc return value: 1 if info has been completed, 0 otherwise (and operation this request was for
 will then fail)*/
 typedef struct
@@ -262,22 +274,22 @@ typedef struct {
 
 
 typedef struct {
-	/* GF_EVENT_OPENFILE*/
+	/* GF_EVENT_DROPFILE*/
 	u8 type;
 	u32 nb_files;
 	char **files;
 } GF_EventOpenFile;
 
 typedef struct {
-	/* GF_EVENT_FORWARDED*/
+	/*GF_EVENT_FROM_SERVICE*/
 	u8 type;
-	/*one of te above event*/
+	//cf GF_EVT_FORWARDED_ *
 	u8 forward_type;
 	/*original type of event as forwarded by the service*/
 	u32 service_event_type;
 	/*parameter of event as forwarded by the service - creation/deletion is handled by the service*/
 	void *param;
-} GF_EventForwarded;
+} GF_EventFromService;
 
 typedef union
 {
@@ -299,8 +311,9 @@ typedef union
 	GF_EventMove move;
 	GF_EventVideoSetup setup;
 	GF_EventMutation mutation;
-	GF_EventForwarded forwarded_event;
 	GF_EventOpenFile open_file;
+	GF_EventAddonConnect addon_connect;
+	GF_EventFromService from_service;
 } GF_Event;
 
 

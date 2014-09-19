@@ -1,7 +1,7 @@
 /*
  *			GPAC - Multimedia Framework C SDK
  *
- *			Authors: Jean Le Feuvre 
+ *			Authors: Jean Le Feuvre
  *			Copyright (c) Telecom ParisTech 2000-2012
  *					All rights reserved
  *
@@ -11,15 +11,15 @@
  *  it under the terms of the GNU Lesser General Public License as published by
  *  the Free Software Foundation; either version 2, or (at your option)
  *  any later version.
- *   
+ *
  *  GPAC is distributed in the hope that it will be useful,
  *  but WITHOUT ANY WARRANTY; without even the implied warranty of
  *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  *  GNU Lesser General Public License for more details.
- *   
+ *
  *  You should have received a copy of the GNU Lesser General Public
  *  License along with this library; see the file COPYING.  If not, write to
- *  the Free Software Foundation, 675 Mass Ave, Cambridge, MA 02139, USA. 
+ *  the Free Software Foundation, 675 Mass Ave, Cambridge, MA 02139, USA.
  *
  */
 
@@ -39,7 +39,7 @@ extern "C" {
 		Media Object
 
   opaque handler for all natural media objects (audio, video, image) so that compositor and systems engine
-are not too tied up. 
+are not too tied up.
 	NOTE: the media object location relies on the node parent graph (this is to deal with namespaces in OD framework)
 therefore it is the task of the media management app to setup clear links between the scene graph and its ressources
 (but this is not mandatory, cf URLs in VRML )
@@ -76,15 +76,15 @@ you must use the gf_mo_get_speed and gf_mo_get_loop in order to know whether the
 /*set speed of media - speed is not always applied, depending on media control settings.
 NOTE: audio pitching is the responsability of the rendering app*/
 void gf_mo_set_speed(GF_MediaObject *mo, Fixed speed);
-/*returns current speed of media - in_speed is the speed of the media as set in the node (MovieTexture, 
+/*returns current speed of media - in_speed is the speed of the media as set in the node (MovieTexture,
 AudioClip and AudioSource) - the return value is the real speed of the media as overloaded by mediaControl if any*/
 Fixed gf_mo_get_speed(GF_MediaObject *mo, Fixed in_speed);
-/*returns looping flag of media - in_loop is the looping flag of the media as set in the node (MovieTexture, 
+/*returns looping flag of media - in_loop is the looping flag of the media as set in the node (MovieTexture,
 AudioClip) - the return value is the real loop flag of the media as overloaded by mediaControl if any*/
 Bool gf_mo_get_loop(GF_MediaObject *mo, Bool in_loop);
 /*returns media object duration*/
 Double gf_mo_get_duration(GF_MediaObject *mo);
-/*returns whether the object should be deactivated (stop) or not - this checks object status as well as 
+/*returns whether the object should be deactivated (stop) or not - this checks object status as well as
 mediaControl status */
 Bool gf_mo_should_deactivate(GF_MediaObject *mo);
 /*checks whether the target object is changed - you MUST use this in order to detect url changes*/
@@ -94,16 +94,22 @@ Bool gf_mo_url_changed(GF_MediaObject *mo, MFURL *url);
 Bool gf_mo_is_raw_memory(GF_MediaObject *mo);
 GF_Err gf_mo_get_raw_image_planes(GF_MediaObject *mo, u8 **pY_or_RGB, u8 **pU, u8 **pV);
 
-/*fetch media data 
+
+/*returns min frame duration for his object or 0 if unknown*/
+u32 gf_mo_get_min_frame_dur(GF_MediaObject *mo);
+
+/*fetch media data
 
 */
-char *gf_mo_fetch_data(GF_MediaObject *mo, Bool resync, Bool *eos, u32 *timestamp, u32 *size, s32 *ms_until_pres, u32 *ms_until_next);
+char *gf_mo_fetch_data(GF_MediaObject *mo, Bool resync, Bool *eos, u32 *timestamp, u32 *size, s32 *ms_until_pres, s32 *ms_until_next);
 
-/*release given amount of media data - nb_bytes is used for audio - if forceDrop is set, the unlocked frame will be 
-droped if all bytes are consumed, otherwise it will be droped based on object time - typically, video fetches with the resync
-flag set and release without forceDrop, while audio fetches without resync but forces buffer drop. If forceDrop is set to 2, 
-the frame will be stated as a discraded frame*/
-void gf_mo_release_data(GF_MediaObject *mo, u32 nb_bytes, s32 forceDrop);
+/*release given amount of media data - nb_bytes is used for audio  - drop_mode can take the following values:
+-1: do not drop
+0: do not force drop: the unlocked frame it will be droped based on object time (typically video)
+1: force drop : the unlocked frame will be droped if all bytes are consumed (typically audio)
+2: the frame will be stated as a discraded frame
+*/
+void gf_mo_release_data(GF_MediaObject *mo, u32 nb_bytes, s32 drop_mode);
 /*get media time*/
 void gf_mo_get_media_time(GF_MediaObject *mo, u32 *media_time, u32 *media_dur);
 /*get object clock*/
@@ -135,7 +141,7 @@ Bool gf_mo_set_position(GF_MediaObject *mo, GF_Window *src, GF_Window *dst);
 
 enum
 {
-	/*this is set to 0 by the OD manager whenever a change occur in the media (w/h change, SR change, etc) 
+	/*this is set to 0 by the OD manager whenever a change occur in the media (w/h change, SR change, etc)
 	as a hint for the compositor*/
 	GF_MO_IS_INIT = (1<<1),
 	/*used by animation stream to remove TEXT from display upon delete and URL change*/
@@ -156,7 +162,6 @@ GF_SceneGraph *gf_mo_get_scenegraph(GF_MediaObject *mo);
 void gf_mo_del(GF_MediaObject *mo);
 
 GF_DOMEventTarget  *gf_mo_event_target_add_node(GF_MediaObject *mo, GF_Node *n);
-GF_DOMEventTarget  *gf_mo_event_target_add_object(GF_MediaObject *mo, void *object);
 GF_Err              gf_mo_event_target_remove(GF_MediaObject *mo, GF_DOMEventTarget *target);
 GF_Err              gf_mo_event_target_remove_by_node(GF_MediaObject *mo, GF_Node *node);
 GF_Err              gf_mo_event_target_remove_by_index(GF_MediaObject *mo, u32 i);

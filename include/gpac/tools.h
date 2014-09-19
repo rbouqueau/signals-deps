@@ -1,7 +1,7 @@
 /*
  *			GPAC - Multimedia Framework C SDK
  *
- *			Authors: Jean Le Feuvre 
+ *			Authors: Jean Le Feuvre
  *			Copyright (c) Telecom ParisTech 2000-2012
  *					All rights reserved
  *
@@ -142,9 +142,9 @@ u64 gf_f64_tell(FILE *f);
  *	\brief large file seeking
  *
  *	Seeks the current read/write position in a large file
- *	\param f Same semantics as gf_f64_seek
- *	\param pos Same semantics as gf_f64_seek
- *	\param whence Same semantics as gf_f64_seek
+ *	\param f Same semantics as fseek
+ *	\param pos Same semantics as fseek
+ *	\param whence Same semantics as fseek
  *	\return new position in the file
  *	\note You only need to call this function if you're suspecting the file to be a large one (usually only media files), otherwise use regular stdio.
 */
@@ -454,7 +454,7 @@ Bool gf_log_tool_level_on(u32 log_tool, u32 log_level);
  *	\brief Set log tools and levels
  *
  *	Set log tools and levels according to the log_tools_levels string. All previous log settings are discarded.
- *	\param log_tools_levels string specifying the tools and levels. It is formatted as logToolX@logLevelX:logToolZ@logLevelZ:... 
+ *	\param log_tools_levels string specifying the tools and levels. It is formatted as logToolX\@logLevelX:logToolZ\@logLevelZ:...
  *	\return GF_OK or GF_BAD_PARAM
 */
 GF_Err gf_log_set_tools_levels(const char *log_tools_levels);
@@ -463,7 +463,7 @@ GF_Err gf_log_set_tools_levels(const char *log_tools_levels);
  *	\brief Modify log tools and levels
  *
  *	Modify log tools and levels according to the log_tools_levels string. Previous log settings are kept.
- *	\param log_tools_levels string specifying the tools and levels. It is formatted as logToolX@logLevelX:logToolZ@logLevelZ:... 
+ *	\param val string specifying the tools and levels. It is formatted as logToolX\@logLevelX:logToolZ\@logLevelZ:...
  *	\return GF_OK or GF_BAD_PARAM
 */
 GF_Err gf_log_modify_tools_levels(const char *val);
@@ -518,6 +518,27 @@ u32 gf_rand();
 */
 void gf_get_user_name(char *buf, u32 buf_size);
 
+
+/*!\brief FileEnum info object
+ *
+ *The FileEnumInfo object is used to get file attributes upon enumeration of a directory.
+*/
+typedef struct
+{
+	/*!File is marked as hidden*/
+	Bool hidden;
+	/*!File is a directory*/
+	Bool directory;
+	/*!File is a drive mountpoint*/
+	Bool drive;
+	/*!File is a system file*/
+	Bool system;
+	/*!File size in bytes*/
+	u64 size;
+	/*!File last modif time in UTC seconds*/
+	u64 last_modified;
+} GF_FileEnumInfo;
+
 /*!
  *	\brief Directory Enumeration Callback
  *
@@ -525,10 +546,11 @@ void gf_get_user_name(char *buf, u32 buf_size);
  *	\param cbck Opaque user data.
  *	\param item_name File or directory name.
  *	\param item_path File or directory full path and name from filesystem root.
+ *	\param file_info information for the file or directory.
  *	\return 1 to abort enumeration, 0 to continue enumeration.
  *
  */
-typedef Bool (*gf_enum_dir_item)(void *cbck, char *item_name, char *item_path);
+typedef Bool (*gf_enum_dir_item)(void *cbck, char *item_name, char *item_path, GF_FileEnumInfo *file_info);
 /*!
  *	\brief Directory enumeration
  *
@@ -664,12 +686,46 @@ void gf_sys_init(Bool enable_memory_tracker);
  */
 void gf_sys_close();
 /*!
+ *	\brief System arguments
+ *
+ *	Sets the user app arguments (used by GUI mode)
+ *	\param argc Number of arguments
+ *	\param argv Array of arguments
+ */
+void gf_sys_set_args(s32 argc, const char **argv);
+
+/*!
+ *	\brief Get number of args
+ *
+ *	Gets the number of argument of the user application if any
+ *	\return number of argument of the user application
+ */
+u32 gf_sys_get_argc();
+
+/*!
+ *	\brief Get number of args
+ *
+ *	Gets the number of argument of the user application if any
+ *	\param arg Index of argument to retrieve
+ *	\return number of argument of the user application
+ */
+const char *gf_sys_get_arg(u32 arg);
+
+/*!
  *	\brief System clock query
  *
  *	Gets the system clock time.
- *	\return System clock value since initialization in milliseconds.
+ *	\return System clock value since GPAC initialization in milliseconds.
  */
 u32 gf_sys_clock();
+
+/*!
+ *	\brief High precision system clock query
+ *
+ *	Gets the hight precision system clock time.
+ *	\return System clock value since GPAC initialization in microseconds.
+ */
+u64 gf_sys_clock_high_res();
 
 /*!
  *	\brief Sleeps thread/process
@@ -712,7 +768,7 @@ GF_Err gf_cleanup_dir(char* DirPathName);
  */
 u32 gf_crc_32(const char *data, u32 size);
 
-#ifdef _WIN32_WCE
+#ifdef WIN32
 /*!
  *	\brief WINCE time constant
  *	\hideinitializer
@@ -724,39 +780,40 @@ u32 gf_crc_32(const char *data, u32 size);
 #endif
 
 /*!
- *\brief gets UTC time in milliseconds 
+ *\brief gets UTC time in milliseconds
  *
- *Gets UTC clock in milliseconds
- \retrun UTC time in milliseconds
+ * Gets UTC clock in milliseconds
+ * \return UTC time in milliseconds
  */
 u64 gf_net_get_utc();
 
 /*!
- *\brief parses date and returns UTC value for this date. Date format is an XSD dateTime format or any of the supported formats from HTTP 1.1: 
-	Sun, 06 Nov 1994 08:49:37 GMT  ; RFC 822, updated by RFC 1123  
+ *\brief parses date and returns UTC value for this date. Date format is an XSD dateTime format or any of the supported formats from HTTP 1.1:
+	Sun, 06 Nov 1994 08:49:37 GMT  ; RFC 822, updated by RFC 1123
 	Sunday, 06-Nov-94 08:49:37 GMT ; RFC 850, obsoleted by RFC 1036
-	Sun Nov  6 08:49:37 1994       ; ANSI C's asctime() formatgets UTC time in milliseconds 
+	Sun Nov  6 08:49:37 1994       ; ANSI C's asctime() formatgets UTC time in milliseconds
  *
- *	\param date string containing the date to parse
- \retrun UTC time in milliseconds
+ * \param date string containing the date to parse
+ * \return UTC time in milliseconds
  */
 u64 gf_net_parse_date(const char *date);
 
 /*!
- *\brief gets timezone adjustment in seconds 
+ *\brief gets timezone adjustment in seconds
  *
- *Gets gets timezone adjustment in seconds, with localtime - timezone = UTC time
- \retrun timezone shift in seconds
+ * Gets timezone adjustment in seconds, with localtime - timezone = UTC time
+ * \return timezone shift in seconds
  */
 s32 gf_net_get_timezone();
 
 /*!
- *\brief parses 128 bit from string 
+ *\brief parses 128 bit from string
  *
- *Parses 128 bit from string 
- \param string the string containing the value in hexa. Non alphanum characters are skipped
- \param value the value parsed
- \return error code if any
+ * Parses 128 bit from string
+ *
+ * \param string the string containing the value in hexa. Non alphanum characters are skipped
+ * \param value the value parsed
+ * \return error code if any
  */
 GF_Err gf_bin128_parse(char *string, bin128 value);
 
@@ -870,7 +927,7 @@ char * gf_get_default_cache_directory();
 GF_Err gf_gz_compress_payload(char **data, u32 data_len, u32 *out_size);
 
 /**
- * Decompresses a data buffer using zlib. 
+ * Decompresses a data buffer using zlib.
  * \param data data buffer to be decompressed
  * \param data_len length of the data buffer to be decompressed
  * \param uncompressed_data pointer to the uncompressed data buffer. It is the responsibility of the caller to free this buffer.
@@ -883,23 +940,25 @@ GF_Err gf_gz_decompress_payload(char *data, u32 data_len, char **uncompressed_da
 /*SHA1*/
 typedef struct __sha1_context GF_SHA1Context;
 
+#define GF_SHA1_DIGEST_SIZE		20
+#define GF_SHA1_DIGEST_SIZE_HEXA		41
 /*
  * Core SHA-1 functions
  */
 GF_SHA1Context *gf_sha1_starts();
 void gf_sha1_update(GF_SHA1Context *ctx, u8 *input, u32 length);
-void gf_sha1_finish(GF_SHA1Context *ctx, u8 digest[20] );
+void gf_sha1_finish(GF_SHA1Context *ctx, u8 digest[GF_SHA1_DIGEST_SIZE] );
 
 /*
  * Output SHA-1(file contents), returns 0 if successful.
  */
-int gf_sha1_file(const char *filename, u8 digest[20]);
+int gf_sha1_file(const char *filename, u8 digest[GF_SHA1_DIGEST_SIZE]);
 
 /*
  * Output SHA-1(buf)
  */
-void gf_sha1_csum(u8 *buf, u32 buflen, u8 digest[20]);
-void gf_sha1_csum_hexa(u8 *buf, u32 buflen, u8 digest[41]);
+void gf_sha1_csum(u8 *buf, u32 buflen, u8 digest[GF_SHA1_DIGEST_SIZE]);
+void gf_sha1_csum_hexa(u8 *buf, u32 buflen, u8 digest[GF_SHA1_DIGEST_SIZE_HEXA]);
 
 #ifdef GPAC_ANDROID
 typedef void (*fm_callback_func)(void *cbk_obj, u32 type, u32 param, int *value);

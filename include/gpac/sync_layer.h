@@ -1,7 +1,7 @@
 /*
  *			GPAC - Multimedia Framework C SDK
  *
- *			Authors: Jean Le Feuvre 
+ *			Authors: Jean Le Feuvre
  *			Copyright (c) Telecom ParisTech 2000-2012
  *					All rights reserved
  *
@@ -11,15 +11,15 @@
  *  it under the terms of the GNU Lesser General Public License as published by
  *  the Free Software Foundation; either version 2, or (at your option)
  *  any later version.
- *   
+ *
  *  GPAC is distributed in the hope that it will be useful,
  *  but WITHOUT ANY WARRANTY; without even the implied warranty of
  *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  *  GNU Lesser General Public License for more details.
- *   
+ *
  *  You should have received a copy of the GNU Lesser General Public
  *  License along with this library; see the file COPYING.  If not, write to
- *  the Free Software Foundation, 675 Mass Ave, Cambridge, MA 02139, USA. 
+ *  the Free Software Foundation, 675 Mass Ave, Cambridge, MA 02139, USA.
  *
  */
 
@@ -30,7 +30,7 @@
 extern "C" {
 #endif
 
-	
+
 /*the Sync Layer config descriptor*/
 typedef struct
 {
@@ -112,10 +112,13 @@ typedef struct
 	/*CENC extensions*/
 	u8 cenc_encrypted;
 	char *sai;
+	u8 IV_size;
 	u32 saiz;
 	/*version_number are pushed from m2ts sections to the mpeg4sl layer so as to handle mpeg4 stream dependencies*/
 	u8 m2ts_version_number_plus_one;
 	u8 m2ts_pcr;
+	/* HTML5 MSE Packet info */
+	s64 timeStampOffset;
 } GF_SLHeader;
 
 

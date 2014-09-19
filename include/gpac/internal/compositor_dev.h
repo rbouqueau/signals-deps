@@ -1,7 +1,7 @@
 /*
  *			GPAC - Multimedia Framework C SDK
  *
- *			Authors: Jean Le Feuvre 
+ *			Authors: Jean Le Feuvre
  *			Copyright (c) Telecom ParisTech 2000-2012
  *					All rights reserved
  *
@@ -11,15 +11,15 @@
  *  it under the terms of the GNU Lesser General Public License as published by
  *  the Free Software Foundation; either version 2, or (at your option)
  *  any later version.
- *   
+ *
  *  GPAC is distributed in the hope that it will be useful,
  *  but WITHOUT ANY WARRANTY; without even the implied warranty of
  *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  *  GNU Lesser General Public License for more details.
- *   
+ *
  *  You should have received a copy of the GNU Lesser General Public
  *  License along with this library; see the file COPYING.  If not, write to
- *  the Free Software Foundation, 675 Mass Ave, Cambridge, MA 02139, USA. 
+ *  the Free Software Foundation, 675 Mass Ave, Cambridge, MA 02139, USA.
  *
  */
 
@@ -50,7 +50,7 @@ extern "C" {
 
 
 /*if defined, events are queued before being processed, otherwise they are handled whenever triggered*/
-//#define GF_SR_EVENT_QUEUE	
+//#define GF_SR_EVENT_QUEUE
 
 
 /*use 2D caching for groups*/
@@ -91,7 +91,7 @@ typedef struct _gf_ft_mgr GF_FontManager;
 #include <gpac/internal/camera.h>
 #include <gpac/internal/mesh.h>
 
-typedef struct 
+typedef struct
 {
 	Bool multisample;
 	Bool bgra_texture;
@@ -99,9 +99,10 @@ typedef struct
 	Bool npot_texture;
 	Bool rect_texture;
 	Bool point_sprite;
-	Bool vbo;
+	Bool vbo, pbo;
 	u32 yuv_texture;
 	Bool has_shaders;
+	s32 max_texture_size;
 } GLCaps;
 
 #endif
@@ -166,6 +167,8 @@ struct __tag_compositor
 	/*0: not init, 1: running, 2: exit requested, 3: done*/
 	u32 video_th_state;
 
+	u32 video_th_id;
+
 	/*compositor exclusive access to the scene and display*/
 	GF_Mutex *mx;
 
@@ -179,20 +182,27 @@ struct __tag_compositor
 	GF_List *extra_scenes;
 
 	u32 inherit_type_3d;
-	
+
 	/*all time nodes registered*/
 	GF_List *time_nodes;
 	/*all textures (texture handlers)*/
 	GF_List *textures;
+	Bool texture_inserted;
 
-#ifdef GF_SR_EVENT_QUEUE
+	/*all textures to be destroyed (needed for openGL context ...)*/
+	GF_List *textures_gc;
+
 	/*event queue*/
-	GF_List *events;
-	GF_Mutex *ev_mx;
-#endif
+	GF_List *event_queue, *event_queue_back;
+	GF_Mutex *evq_mx;
+
+	Bool video_setup_failed;
 
 	/*simulation frame rate*/
 	Double frame_rate;
+	Bool bench_mode;
+	//0: no frame pending, 1: frame pending, needs clock increase, 2: frames are pending but one frame has been decoded, do not increase clock
+	u32 force_bench_frame;
 	Bool no_regulation;
 	u32 frame_duration;
 	u32 frame_time[GF_SR_FPS_COMPUTE_SIZE];
@@ -201,15 +211,17 @@ struct __tag_compositor
 	u32 last_frame_time, caret_next_draw_time;
 	Bool show_caret;
 	Bool text_edit_changed;
-
+	u32 scene_sampled_clock;
 	u32 last_click_time;
 	u32 next_frame_delay;
 	s32 frame_delay;
+	Bool video_frame_pending;
+	Bool fullscreen_postponed;
 
 	/*display size*/
 	u32 display_width, display_height;
 
-	/*visual output location on window (we may draw background color outside of it) 
+	/*visual output location on window (we may draw background color outside of it)
 		vp_x & vp_y: horizontal & vertical offset of the drawing area in the video output
 		vp_width & vp_height: width & height of the drawing area
 			* in scalable mode, this is the display size
@@ -250,11 +262,16 @@ struct __tag_compositor
 	/*options*/
 	u32 aspect_ratio, antiAlias, texture_text_mode;
 	Bool high_speed, stress_mode;
-	Bool was_opengl;
+	Bool is_opengl;
+	Bool autoconfig_opengl;
 	u32 force_opengl_2d;
 #ifdef OPENGL_RASTER
 	Bool opengl_raster;
 #endif
+
+	//in this mode all 2D raster is done through and RGBA canvas except background IO and textures which are done by the GPU. The canvas is then flushed to GPU.
+	//the mode supports defer and immediate rendering
+	Bool hybrid_opengl;
 
 	/*key modif*/
 	u32 key_states;
@@ -289,7 +306,7 @@ struct __tag_compositor
 	GF_VisualManager *visual;
 	/*set to false whenever a new scene is attached to compositor*/
 	Bool root_visual_setup;
-	
+
 	/*indicates whether the aspect ratio shall be recomputed:
 		1: AR changed
 		2: AR changed and root visual type changed between 2D and 3D
@@ -384,6 +401,7 @@ struct __tag_compositor
 	/*highlight fill and stroke colors (ARGB)*/
 	u32 highlight_fill, highlight_stroke;
 	Fixed highlight_stroke_width;
+	Bool disable_focus_highlight;
 
 	/*picking info*/
 
@@ -414,8 +432,8 @@ struct __tag_compositor
 	/*the active parent text node under selection*/
 	GF_Node *text_selection;
 	/*text selection start/end in world coord system*/
-	SFVec2f start_sel, end_sel;	
-	/*text selection state*/ 
+	SFVec2f start_sel, end_sel;
+	/*text selection state*/
 	u32 store_text_state;
 	/*parent text node when a text is hit (to handle tspan selection)*/
 	GF_Node *hit_text;
@@ -445,8 +463,6 @@ struct __tag_compositor
 	/*disable RECT extensions (except for Bitmap...)*/
 	Bool disable_rect_ext;
 	/*disable RECT extensions (except for Bitmap...)*/
-	Bool bitmap_use_pixels;
-	/*disable RECT extensions (except for Bitmap...)*/
 	u32 draw_normals;
 	/*backface cull type: 0 off, 1: on, 2: on with transparency*/
 	u32 backcull;
@@ -464,6 +480,8 @@ struct __tag_compositor
 	Bool disable_gl_cull;
 	/*YUV textures in OpenGL are disabled (soft YUV->RGB )*/
 	Bool disable_yuvgl;
+	//use PBO to start pushing textures at the begining of the render pass
+	Bool enable_pbo;
 
 	u32 default_navigation_mode;
 
@@ -477,6 +495,8 @@ struct __tag_compositor
 
 	u32 offscreen_width, offscreen_height;
 
+	Bool shader_only_mode;
+
 #ifdef GPAC_USE_TINYGL
 	void *tgl_ctx;
 #endif
@@ -488,10 +508,14 @@ struct __tag_compositor
 	Fixed interoccular_offset;
 	/*specifies distance the camera focal point and the screen plane : <0 is behind the screen, >0 is in front*/
 	Fixed focus_distance;
+
+	struct _gf_sc_texture_handler *hybgl_txh;
+	GF_Mesh *hybgl_mesh;
+	GF_Mesh *hybgl_mesh_background;
 #endif
-	
+
 	Bool texture_from_decoder_memory;
-    
+
 	u32 networks_time;
 	u32 decoders_time;
 
@@ -517,6 +541,18 @@ struct __tag_compositor
 #endif
 };
 
+typedef struct
+{
+	GF_Event evt;
+	GF_DOM_Event dom_evt;
+	GF_Node *node;
+	GF_DOMEventTarget *target;
+	GF_SceneGraph *sg;
+} GF_QueuedEvent;
+
+void gf_sc_queue_dom_event(GF_Compositor *compositor, GF_Node *node, GF_DOM_Event *evt);
+void gf_sc_queue_dom_event_on_target(GF_Compositor *compositor, GF_DOM_Event *evt, GF_DOMEventTarget *target, GF_SceneGraph *sg);
+void gf_sc_queue_event(GF_Compositor *compositor, GF_Event *evt);
 
 /*base stack for timed nodes (nodes that activate themselves at given times)
 	@UpdateTimeNode: shall be setup by the node handler and is called once per simulation frame
@@ -546,7 +582,7 @@ enum
 	GF_SR_TEXTURE_MATTE = (1<<2),
 	/*texture doesn't need vertical flip for OpenGL*/
 	GF_SR_TEXTURE_NO_GL_FLIP = (1<<3),
-	/*Set durin a composition cycle. If not set at the end of the cycle, 
+	/*Set durin a composition cycle. If not set at the end of the cycle,
 	the hardware binding is released*/
 	GF_SR_TEXTURE_USED = (1<<4),
 
@@ -581,12 +617,12 @@ typedef struct _gf_sc_texture_handler
 	u32 last_frame_time;
 	/*active display in the texture (0, 0 == top, left)*/
 	//GF_Rect active_window;
-	/*texture is transparent*/		
+	/*texture is transparent*/
 	Bool transparent;
 	/*flags for user - the repeatS and repeatT are set upon creation, the rest is NEVER touched by compositor*/
 	u32 flags;
 	/*gradients are relative to the object bounds, therefore a gradient is not the same if used on 2 different
-	objects - since we don't want to build an offscreen texture for the gradient, gradients have to be updated 
+	objects - since we don't want to build an offscreen texture for the gradient, gradients have to be updated
 	at each draw - the matrix shall be updated to the gradient transformation in the local system
 	MUST be set for gradient textures*/
 	void (*compute_gradient_matrix)(struct _gf_sc_texture_handler *txh, GF_Rect *bounds, GF_Matrix2D *mat, Bool for_3d);
@@ -594,7 +630,7 @@ typedef struct _gf_sc_texture_handler
 	/*image data for natural media*/
 	char *data;
 	u32 width, height, stride, pixelformat, pixel_ar;
-    Bool is_flipped;
+	Bool is_flipped;
 
 	Bool raw_memory;
 	u8 *pU, *pV;
@@ -624,6 +660,8 @@ GF_TextureHandler *gf_sc_texture_get_handler(GF_Node *n);
 
 /*returns 1 if url changed from current one*/
 Bool gf_sc_texture_check_url_change(GF_TextureHandler *txh, MFURL *url);
+/* opens associated object */
+GF_Err gf_sc_texture_open(GF_TextureHandler *txh, MFURL *url, Bool lock_scene_timeline);
 /*starts associated object*/
 GF_Err gf_sc_texture_play(GF_TextureHandler *txh, MFURL *url);
 GF_Err gf_sc_texture_play_from_to(GF_TextureHandler *txh, MFURL *url, Double start_offset, Double end_offset, Bool can_loop, Bool lock_scene_timeline);
@@ -636,9 +674,10 @@ void gf_sc_texture_update_frame(GF_TextureHandler *txh, Bool disable_resync);
 /*release video memory if needed*/
 void gf_sc_texture_release_stream(GF_TextureHandler *txh);
 
+void gf_sc_texture_cleanup_hw(GF_Compositor *compositor);
 
 
-/*sensor node handler - this is not defined as a stack because Anchor is both a grouping node and a 
+/*sensor node handler - this is not defined as a stack because Anchor is both a grouping node and a
 sensor node, and we DO need the groupingnode stack...*/
 typedef struct _sensor_handler
 {
@@ -663,6 +702,7 @@ Bool compositor_mpeg4_is_sensor_node(GF_Node *node);
 /*returns associated sensor handler from traversable stack (the node handler is always responsible for creation/deletion)
 returns NULL if not a sensor or sensor is not activated*/
 GF_SensorHandler *compositor_mpeg4_get_sensor_handler(GF_Node *n);
+GF_SensorHandler *compositor_mpeg4_get_sensor_handler_ex(GF_Node *n, Bool skip_anchors);
 
 /*rendering modes*/
 enum
@@ -691,7 +731,7 @@ enum
 #ifndef GPAC_DISABLE_3D
 	/*explicit draw routine used when flushing 3D display list*/
 	TRAVERSE_DRAW_3D,
-	/*set global lights on. Since the model_matrix is not pushed to the target in this 
+	/*set global lights on. Since the model_matrix is not pushed to the target in this
 	pass, global lights shall not forget to do it (cf lighting.c)*/
 	TRAVERSE_LIGHTING,
 	/*collision routine*/
@@ -707,7 +747,7 @@ typedef struct _group_cache_candidate GF_CacheCandidate;
 #define MAX_USER_CLIP_PLANES		4
 
 
-/*the traversing context: set_up at top-level and passed through SFNode_Render. Each node is responsible for 
+/*the traversing context: set_up at top-level and passed through SFNode_Render. Each node is responsible for
 restoring the context state before returning*/
 struct _traversing_state
 {
@@ -743,7 +783,7 @@ struct _traversing_state
 
 	/*the one and only visual manager currently being traversed*/
 	GF_VisualManager *visual;
-	
+
 #ifndef GPAC_DISABLE_VRML
 	/*current background and viewport stacks*/
 	GF_List *backgrounds;
@@ -774,6 +814,9 @@ struct _traversing_state
 	/*parent group for composition: can be Form, Layout or Layer2D*/
 	struct _parent_node_2d *parent;
 
+	/*override appearance of all nodes with this one*/
+	GF_Node *override_appearance;
+
 	/*group/object bounds in local coordinate system*/
 	GF_Rect bounds;
 
@@ -782,7 +825,7 @@ struct _traversing_state
 	Bool abort_bounds_traverse;
 	GF_Matrix2D mx_at_node;
 	Bool ignore_strike;
-	
+
 	GF_List *use_stack;
 
 	/* Styling Property and others for SVG context */
@@ -809,7 +852,7 @@ struct _traversing_state
 	Fixed base_x, base_y;
 	Fixed line_spacing;
 	Fixed base_shift;
-	/*quick and dirty hack to try to solve xml:space across text and tspans without 
+	/*quick and dirty hack to try to solve xml:space across text and tspans without
 	flattening the DOMText nodes
 	0: first block of text
 	1: previous block of text ended with a space
@@ -834,8 +877,10 @@ struct _traversing_state
 	Bool has_clip, has_layer_clip;
 	/*active clipper in world coord system */
 	GF_Rect clipper, layer_clipper;
+	/*current object (model) transformation at the given layer*/
+	GF_Matrix layer_matrix;
 
-	
+
 	/*set when traversing a cached group during offscreen bitmap construction.*/
 	Bool in_group_cache;
 
@@ -852,7 +897,7 @@ struct _traversing_state
 
 #ifndef GPAC_DISABLE_VRML
 	/*fog bind stack*/
-	GF_List *fogs; 
+	GF_List *fogs;
 	/*navigation bind stack*/
 	GF_List *navigations;
 #endif
@@ -881,20 +926,20 @@ struct _traversing_state
 
 	/*layer traversal state:
 		set to the first traversed layer3D when picking
-		set to the current layer3D traversed when rendering 3D to an offscreen bitmap. This alows other 
-			nodes (typically bindables) seting the layer dirty flags to force a redraw 
+		set to the current layer3D traversed when rendering 3D to an offscreen bitmap. This alows other
+			nodes (typically bindables) seting the layer dirty flags to force a redraw
 	*/
 	GF_Node *layer3d;
 #endif
 
-	
+
 #ifdef GF_SR_USE_DEPTH
-    Fixed depth_gain, depth_offset;
+	Fixed depth_gain, depth_offset;
 #endif
 
 
 #ifdef GF_SR_USE_VIDEO_CACHE
-	/*set to 1 if cache evaluation can be skipped - this is only set when there is not enough memory 
+	/*set to 1 if cache evaluation can be skipped - this is only set when there is not enough memory
 	to cache a sub-group, in which case the group cannot be cached (we're caching in display coordinates)*/
 	Bool cache_too_small;
 #endif
@@ -907,7 +952,7 @@ struct _traversing_state
 /*the audio object as used by the mixer. All audio nodes need to implement this interface*/
 typedef struct _audiointerface
 {
-	/*fetch audio data for a given audio delay (~soundcard drift) - if delay is 0 sync should not be performed 
+	/*fetch audio data for a given audio delay (~soundcard drift) - if delay is 0 sync should not be performed
 	(eg intermediate mix) */
 	char *(*FetchFrame) (void *callback, u32 *size, u32 audio_delay_ms);
 	/*release a number of bytes in the indicated frame (ts)*/
@@ -920,7 +965,7 @@ typedef struct _audiointerface
 	Bool (*IsMuted)(void *callback);
 	/*user callback*/
 	void *callback;
-	/*returns 0 if config is not known yet or changed, 
+	/*returns 0 if config is not known yet or changed,
 	otherwise AND IF @for_reconf is set, updates member var below and return TRUE
 	You may return 0 to force parent user invalidation*/
 	Bool (*GetConfig)(struct _audiointerface *ai, Bool for_reconf);
@@ -996,7 +1041,7 @@ typedef struct _audio_render
 	/*frozen time counter if set*/
 	Bool Frozen;
 	u32 FreezeTime;
-	
+
 	/*final output*/
 	GF_AudioMixer *mixer;
 	Bool need_reconfig;
@@ -1012,7 +1057,7 @@ typedef struct _audio_render
 	u32 audio_delay, volume, pan, mute;
 
 	GF_AudioFilterChain filter_chain;
-	u32 nb_filled, nb_used; 
+	u32 nb_filled, nb_used;
 } GF_AudioRenderer;
 
 /*creates audio renderer*/
@@ -1095,7 +1140,7 @@ Bool gf_sc_audio_check_url(GF_AudioInput *ai, MFURL *url);
 #define AUDIO_GROUP_NODE	\
 	GF_AudioInput output;		\
 	void (*add_source)(struct _audio_group *_this, GF_AudioInput *src);	\
-
+ 
 typedef struct _audio_group
 {
 	AUDIO_GROUP_NODE
@@ -1120,6 +1165,12 @@ GF_Err compositor_2d_get_video_access(GF_VisualManager *surf);
 void compositor_2d_release_video_access(GF_VisualManager *surf);
 void compositor_2d_init_callbacks(GF_Compositor *compositor);
 GF_Rect compositor_2d_update_clipper(GF_TraverseState *tr_state, GF_Rect this_clip, Bool *need_restore, GF_Rect *original, Bool for_layer);
+
+#ifndef GPAC_DISABLE_3D
+void compositor_2d_reset_gl_auto(GF_Compositor *compositor);
+void compositor_2d_hybgl_flush_video(GF_Compositor *compositor, GF_IRect *area);
+void compositor_2d_hybgl_clear_surface(GF_VisualManager *visual, GF_IRect *rc, u32 BackColor, Bool is_offscreen_clear);
+#endif
 
 Bool compositor_texture_rectangles(GF_VisualManager *visual, GF_TextureHandler *txh, GF_IRect *clip, GF_Rect *unclip, GF_Window *src, GF_Window *dst, Bool *disable_blit, Bool *has_scale);
 
@@ -1176,6 +1227,8 @@ const char *gf_scene_get_service_url(GF_SceneGraph *sg);
 Bool gf_scene_is_over(GF_SceneGraph *sg);
 GF_SceneGraph *gf_scene_enum_extra_scene(GF_SceneGraph *sg, u32 *i);
 
+Bool gf_scene_is_dynamic_scene(GF_SceneGraph *sg);
+
 #ifndef GPAC_DISABLE_SVG
 
 void compositor_svg_build_gradient_texture(GF_TextureHandler *txh);
@@ -1210,7 +1263,7 @@ GF_SceneGraph *gf_sc_animation_get_scenegraph(GF_Node *node);
 
 typedef struct _gf_font GF_Font;
 
-struct _gf_font 
+struct _gf_font
 {
 	/*fonts are linked within the font manager*/
 	GF_Font *next;
@@ -1237,7 +1290,7 @@ struct _gf_font
 	GF_List *spans;
 };
 
-enum 
+enum
 {
 	/*span direction is horizontal*/
 	GF_TEXT_SPAN_HORIZONTAL = 1,
@@ -1254,7 +1307,7 @@ enum
 typedef struct __text_span
 {
 	GF_Font *font;
-	
+
 	GF_Glyph **glyphs;
 	u32 nb_glyphs;
 
@@ -1341,10 +1394,10 @@ GF_Err gf_sc_remove_video_listener(GF_Compositor *compositor, GF_VideoListener *
 typedef struct
 {
 	void *udta;
-	/*called when audio frame is ready to be sent to the sound card. 
+	/*called when audio frame is ready to be sent to the sound card.
 		@buffer, @buffer_size: audio buffer
 		@time: the terminal global clock in ms
-		@delay: Due to sound card latencies, audio is sent to the sound card delay milliseconds earlier than 
+		@delay: Due to sound card latencies, audio is sent to the sound card delay milliseconds earlier than
 		its associated video.
 	*/
 	void (*on_audio_frame)(void *udta, char *buffer, u32 buffer_size, u32 time, u32 delay);
@@ -1361,7 +1414,15 @@ GF_Err gf_sc_set_scene_size(GF_Compositor *compositor, u32 Width, u32 Height, Bo
 
 
 Bool gf_sc_use_raw_texture(GF_Compositor *compositor);
-void gf_sc_get_av_caps(GF_Compositor *compositor, u32 *width, u32 *height, u32 *bpp, u32 *channels, u32 *sample_rate);
+void gf_sc_get_av_caps(GF_Compositor *compositor, u32 *width, u32 *height, u32 *display_bit_depth, u32 *audio_bpp, u32 *channels, u32 *sample_rate);
+
+//signals the compositor a system frame is pending on a future frame
+void gf_sc_set_system_pending_frame(GF_Compositor *compositor, Bool frame_pending);
+
+//indicates a video frame is pending - this is used fo decoders dispatching their internal memory in order to wake up the compositor asap
+void gf_sc_set_video_pending_frame(GF_Compositor *compositor);
+
+Bool gf_sc_is_over(GF_Compositor *compositor, GF_SceneGraph *scene_graph);
 
 #ifdef __cplusplus
 }

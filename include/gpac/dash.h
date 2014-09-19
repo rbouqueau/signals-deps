@@ -1,7 +1,7 @@
 /*
  *			GPAC - Multimedia Framework C SDK
  *
- *			Authors: Jean Le Feuvre 
+ *			Authors: Jean Le Feuvre
  *			Copyright (c) Telecom ParisTech 2012
  *					All rights reserved
  *
@@ -11,15 +11,15 @@
  *  it under the terms of the GNU Lesser General Public License as published by
  *  the Free Software Foundation; either version 2, or (at your option)
  *  any later version.
- *   
+ *
  *  GPAC is distributed in the hope that it will be useful,
  *  but WITHOUT ANY WARRANTY; without even the implied warranty of
  *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  *  GNU Lesser General Public License for more details.
- *   
+ *
  *  You should have received a copy of the GNU Lesser General Public
  *  License along with this library; see the file COPYING.  If not, write to
- *  the Free Software Foundation, 675 Mass Ave, Cambridge, MA 02139, USA. 
+ *  the Free Software Foundation, 675 Mass Ave, Cambridge, MA 02139, USA.
  *
  */
 
@@ -45,7 +45,7 @@ static const char * GF_DASH_MPD_MIME_TYPES[] = { "application/dash+xml", "video/
  */
 static const char * GF_DASH_M3U8_MIME_TYPES[] = { "video/x-mpegurl", "audio/x-mpegurl", "application/x-mpegurl", "application/vnd.apple.mpegurl", NULL};
 
-typedef enum 
+typedef enum
 {
 	/*event sent if an error occurs when setting up manifest*/
 	GF_DASH_EVENT_MANIFEST_INIT_ERROR,
@@ -62,6 +62,14 @@ typedef enum
 	GF_DASH_EVENT_BUFFER_DONE,
 
 	GF_DASH_EVENT_SEGMENT_AVAILABLE,
+
+	/*event sent when quality has been switched for the given group*/
+	GF_DASH_EVENT_QUALITY_SWITCH,
+
+	/*position in timeshift buffer has changed (eg, paused)*/
+	GF_DASH_EVENT_TIMESHIFT_UPDATE,
+	/*event sent when timeshift buffer is overflown - the group_idx param contains the max number of droped segments of all representations droped by the client, or -1 if play pos is ahead of live */
+	GF_DASH_EVENT_TIMESHIFT_OVERFLOW,
 } GF_DASHEventType;
 
 /*structure used for all IO operations for DASH*/
@@ -72,9 +80,13 @@ struct _gf_dash_io
 {
 	/*user private data*/
 	void *udta;
-	
+
 	/*signals errors or specific actions to perform*/
 	GF_Err (*on_dash_event)(GF_DASHFileIO *dashio, GF_DASHEventType evt, s32 group_idx, GF_Err setup_error);
+
+	/*used to check whether a representation is supported or not. Function returns 1 if supported, 0 otheriwse
+	if this callback is not set, the representation is assumed to be supported*/
+	Bool (*dash_codec_supported)(GF_DASHFileIO *dashio, const char *codec, u32 width, u32 height, Bool is_interlaced, u32 fps_num, u32 fps_denum, u32 sample_rate);
 
 	/*called whenever a file has to be deleted*/
 	void (*delete_cache_file)(GF_DASHFileIO *dashio, GF_DASHFileIOSession session, const char *cache_url);
@@ -96,7 +108,7 @@ struct _gf_dash_io
 
 	/*get URL of the file - i tmay be different from the original one if resource relocation happened*/
 	const char *(*get_url)(GF_DASHFileIO *dashio, GF_DASHFileIOSession session);
-	/*get the name of the cache file. If NULL is returned, the file cannot be cached and its associated UTL will be used when 
+	/*get the name of the cache file. If NULL is returned, the file cannot be cached and its associated UTL will be used when
 	the client request file to play*/
 	const char *(*get_cache_name)(GF_DASHFileIO *dashio, GF_DASHFileIOSession session);
 	/*get the MIME type of the file*/
@@ -130,14 +142,16 @@ typedef enum
 	@keep_files: do not delete files from the cache
 	@disable_switching: turn off bandwidth switching algorithm
 	@first_select_mode: indicates which representation to select upon startup
+	@enable_buffering: forces buffering of segments for the duration indicated in the MPD before calling back the user
+	@initial_time_shift_value: sets initial buffering: if between 0 and 100, this is a percentage of the time shift window of the session. If greater than 100, this is a time shift in milliseconds.
 */
-GF_DashClient *gf_dash_new(GF_DASHFileIO *dash_io, 
-						   u32 max_cache_duration, 
-						   u32 auto_switch_count, 
-						   Bool keep_files, 
-						   Bool disable_switching, 
-						   GF_DASHInitialSelectionMode first_select_mode,
-						   Bool enable_buffering, u32 initial_time_shift_percent);
+GF_DashClient *gf_dash_new(GF_DASHFileIO *dash_io,
+                           u32 max_cache_duration,
+                           u32 auto_switch_count,
+                           Bool keep_files,
+                           Bool disable_switching,
+                           GF_DASHInitialSelectionMode first_select_mode,
+                           Bool enable_buffering, u32 initial_time_shift_value);
 
 /*delete the DASH client*/
 void gf_dash_del(GF_DashClient *dash);
@@ -163,7 +177,10 @@ Bool gf_dash_is_running(GF_DashClient *dash);
 Double gf_dash_get_duration(GF_DashClient *dash);
 /*check that the given file has the right XML root element*/
 Bool gf_dash_check_mpd_root_type(const char *local_url);
-
+/*sets timeshift for the presentation - this function does not trigger a seek, this has to be done by the caller
+	@ms_in_timeshift: if between 0 and 100, this is a percentage of the time shift window of the session. If greater than 100, this is a time shift in milliseconds.
+*/
+GF_Err gf_dash_set_timeshift(GF_DashClient *dash, u32 ms_in_timeshift);
 
 /*returns the number of groups. A group is a set of media resources that are alternate of each other in terms of bandwidth/quality.*/
 u32 gf_dash_get_group_count(GF_DashClient *dash);
@@ -174,26 +191,61 @@ void *gf_dash_get_group_udta(GF_DashClient *dash, u32 group_index);
 /*indicates whether a group is selected for playback or not. Currently groups cannot be selected during playback*/
 Bool gf_dash_is_group_selected(GF_DashClient *dash, u32 group_index);
 
+/*indicates whether a group can be selected for playback or not. Some groups may have been disabled because of non supported features*/
+Bool gf_dash_is_group_selectable(GF_DashClient *dash, u32 idx);
+
 /*selects a group for playback. If other groups are alternate to this group (through the @group attribute), they are automatically deselected. */
 void gf_dash_group_select(GF_DashClient *dash, u32 idx, Bool select);
 
 /*performs selection of representations based on language code*/
-void gf_dash_groups_set_language(GF_DashClient *dash, const char *lang_3cc);
+void gf_dash_groups_set_language(GF_DashClient *dash, const char *lang_code_rfc_5646);
 
 /*returns the mime type of the media resources in this group*/
 const char *gf_dash_group_get_segment_mime(GF_DashClient *dash, u32 idx);
 /*returns the URL of tyhe first media resource to play (init segment or first media segment depending on format). start_range and end_range are optional*/
 const char *gf_dash_group_get_segment_init_url(GF_DashClient *dash, u32 idx, u64 *start_range, u64 *end_range);
 
-/*returns the URL and byte range of the next media resource to play in this group. 
+/*returns the language of the group, or NULL if none associated*/
+const char *gf_dash_group_get_language(GF_DashClient *dash, u32 idx);
+
+/*returns the language of the group, or NULL if none associated*/
+u32 gf_dash_group_get_audio_channels(GF_DashClient *dash, u32 idx);
+
+/*get time shift buffer depth of the group - (u32) -1 means infinity*/
+u32 gf_dash_group_get_time_shift_buffer_depth(GF_DashClient *dash, u32 idx);
+
+/*get current time in time shift buffer in seconds - 0 means 'live point'
+this gets the maximum value (further in the past) of all representations playing*/
+u32 gf_dash_get_timeshift_buffer_pos(GF_DashClient *dash);
+
+typedef enum
+{
+	GF_MPD_DESC_ACCESSIBILITY,
+	GF_MPD_DESC_AUDIOCONFIG,
+	GF_MPD_DESC_CONTENT_PROTECTION,
+	GF_MPD_DESC_ESSENTIAL_PROPERTIES,
+	GF_MPD_DESC_SUPPLEMENTAL_PROPERTIES,
+	GF_MPD_DESC_FRAME_PACKING,
+	GF_MPD_DESC_ROLE,
+	GF_MPD_DESC_RATING,
+	GF_MPD_DESC_VIEWPOINT
+} GF_DashDescriptorType;
+
+//enumerate descriptors of the given type:
+//group_idx: index of the group for which descriptors are enumerated
+//desc_type: type of descriptor being checked, one of the above
+//desc_idx: index of the descriptor being checked for this type
+Bool gf_dash_group_enum_descriptor(GF_DashClient *dash, u32 group_idx, GF_DashDescriptorType desc_type, u32 role_idx, const char **desc_id, const char **desc_scheme, const char **desc_value);
+
+/*returns the URL and byte range of the next media resource to play in this group.
 If switching occured, sets switching_index to the new representation index.
-If no bitstream switching is possible, also set the url and byte range of the media file required to intialize 
+If no bitstream switching is possible, also set the url and byte range of the media file required to intialize
 the playback of the next segment
 original_url is optional and may be used to het the URI of the segment
 */
-GF_Err gf_dash_group_get_next_segment_location(GF_DashClient *dash, u32 idx, u32 dependent_representation_index, const char **url, u64 *start_range, u64 *end_range, 
-											s32 *switching_index, const char **switching_url, u64 *switching_start_range, u64 *switching_end_range, 
-											const char **original_url, Bool *has_next_segment);
+GF_Err gf_dash_group_get_next_segment_location(GF_DashClient *dash, u32 idx, u32 dependent_representation_index, const char **url, u64 *start_range, u64 *end_range,
+        s32 *switching_index, const char **switching_url, u64 *switching_start_range, u64 *switching_end_range,
+        const char **original_url, Bool *has_next_segment);
 
 /*same as gf_dash_group_get_next_segment_location but query the current downloaded segment*/
 GF_EXPORT
@@ -202,7 +254,9 @@ GF_Err gf_dash_group_probe_current_download_segment_location(GF_DashClient *dash
 /*returns 1 if segment numbers loops at this level (not allowed but happens when looping captures ...*/
 Bool gf_dash_group_loop_detected(GF_DashClient *dash, u32 idx);
 
-/*returns number of seconds at which playback shall start */
+/*returns number of seconds at which playback shall start for the group in the current period
+the first segment available for the period will be so that gf_dash_group_get_start_range is in this range after the caller
+adjusts it with PTO (eg the returned time is in period timeline, not media timeline */
 Double gf_dash_group_get_start_range(GF_DashClient *dash, u32 idx);
 
 /*discards the first media resource in the queue of this group*/
@@ -218,8 +272,8 @@ GF_Err gf_dash_group_get_presentation_time_offset(GF_DashClient *dash, u32 idx, 
 
 /*returns 1 if the playback position is in the last period of the presentation*/
 Bool gf_dash_in_last_period(GF_DashClient *dash);
-/*return value: 
-	1 if the period switching has been requested (due to seeking), 
+/*return value:
+	1 if the period switching has been requested (due to seeking),
 	2 if the switching is in progress (all groups will soon be destroyed and plyback will be stoped and restarted)
 	0 if no switching is requested
 */
@@ -230,12 +284,13 @@ void gf_dash_request_period_switch(GF_DashClient *dash);
 Bool gf_dash_in_period_setup(GF_DashClient *dash);
 /*seeks playback to the given time. If period changes, all playback is stopped and restarted*/
 void gf_dash_seek(GF_DashClient *dash, Double start_range);
-/*gets playback start range for the first segment to play after the seek has been done. This is the amount of data to skip from the first segment to be played*/
-Double gf_dash_get_playback_start_range(GF_DashClient *dash);
 /*when seeking, this flag is set when the seek is outside of the previously playing segment.*/
 Bool gf_dash_group_segment_switch_forced(GF_DashClient *dash, u32 idx);
 /*get video info for this group if video*/
 GF_Err gf_dash_group_get_video_info(GF_DashClient *dash, u32 idx, u32 *max_width, u32 *max_height);
+
+/*sets playback speed of the session. Speed is used in adaptation logic*/
+void gf_dash_set_speed(GF_DashClient *dash, Double speed);
 
 /*returns the start_time of the first segment in the queue (usually the one being played)*/
 Double gf_dash_group_current_segment_start_time(GF_DashClient *dash, u32 idx);
@@ -247,7 +302,7 @@ void gf_dash_allow_local_mpd_update(GF_DashClient *dash, Bool allow_local_mpd_up
 GF_Err gf_dash_group_get_representation_info(GF_DashClient *dash, u32 idx, u32 representation_idx, u32 *width, u32 *height, u32 *audio_samplerate, u32 *bandwidth, const char **codecs);
 
 /*gets media buffering info for all active representations*/
-void gf_dash_get_buffer_info_buffering(GF_DashClient *dash, u32 *total_buffer, u32 *media_buffered);
+void gf_dash_get_buffer_info(GF_DashClient *dash, u32 *total_buffer, u32 *media_buffered);
 
 /*updates media bandwidth for the given group*/
 GF_Err gf_dash_group_check_bandwidth(GF_DashClient *dash, u32 idx);
@@ -270,8 +325,68 @@ u32 gf_dash_get_min_buffer_time(GF_DashClient *dash);
 //shifts UTC clock of server by shift_utc_ms so that new UTC in MPD is old + shift_utc_ms
 void gf_dash_set_utc_shift(GF_DashClient *dash, s32 shift_utc_ms);
 
-//sets max resolution for all video 
-GF_Err gf_dash_set_max_resolution(GF_DashClient *dash, u32 width, u32 height);
+//sets max resolution@bpp for all video
+GF_Err gf_dash_set_max_resolution(GF_DashClient *dash, u32 width, u32 height, u8 max_display_bpp);
+
+//sets min time in ms between a 404 and the next request on the same group. The default value is 500 ms.
+GF_Err gf_dash_set_min_timeout_between_404(GF_DashClient *dash, u32 min_timeout_between_404);
+
+//sets time in ms after which 404 request for a segment will indicate segment lost. The default value is 100 ms.
+GF_Err gf_dash_set_segment_expiration_threshold(GF_DashClient *dash, u32 expire_after_ms);
+
+
+//only enables the given group - this shall be set before calling @gf_dash_open. If group_index is <0 (default) no groups will be disabled.
+void gf_dash_debug_group(GF_DashClient *dash, s32 group_index);
+
+//indicates typical buffering used by the user app . This allows fetching data earlier in live mode, if the timeshiftbuffer allows for it
+void gf_dash_set_user_buffer(GF_DashClient *dash, u32 buffer_time_ms);
+
+//indicates the number of segments to wait before switching up bandwidth. The default value is 1 (ie stay in current
+//bandwidth or one more segment before switching up, event if download rate is enough)
+//seting to 0 means the switch will happen instantly, but this is more prone to quality changes due to network variations
+void gf_dash_set_switching_probe_count(GF_DashClient *dash, u32 switch_probe_count);
+
+/*returns active period start in ms*/
+u32 gf_dash_get_period_start(GF_DashClient *dash);
+/*returns active period duration in ms*/
+u32 gf_dash_get_period_duration(GF_DashClient *dash);
+
+//returns number of quality available for the given group
+u32 gf_dash_group_get_num_qualities(GF_DashClient *dash, u32 idx);
+
+
+typedef struct
+{
+	u32 bandwidth;
+	const char *ID;
+	const char *mime;
+	const char *codec;
+	u32 width;
+	u32 height;
+	Bool interlaced;
+	u32 fps_den, fps_num;
+	u32 par_num;
+	u32 par_den;
+	u32 sample_rate;
+	u32 nb_channels;
+	Bool disabled;
+	Bool is_selected;
+} GF_DASHQualityInfo;
+
+//returns number of quality available for the given group
+GF_Err gf_dash_group_get_quality_info(GF_DashClient *dash, u32 idx, u32 quality_idx, GF_DASHQualityInfo *quality);
+
+//returns 1 if automatic quality switching is enabled
+Bool gf_dash_get_automatic_switching(GF_DashClient *dash);
+
+//sets automatic quality switching enabled or disabled
+GF_Err gf_dash_set_automatic_switching(GF_DashClient *dash, Bool enable_switching);
+
+//selects quality of given ID
+GF_Err gf_dash_group_select_quality(GF_DashClient *dash, u32 idx, const char *ID);
+
+//gets download rate in bytes per second for the given group
+u32 gf_dash_group_get_download_rate(GF_DashClient *dash, u32 idx);
 
 #endif //GPAC_DISABLE_DASH_CLIENT
 

@@ -1,7 +1,7 @@
 /*
  *			GPAC - Multimedia Framework C SDK
  *
- *			Authors: Jean Le Feuvre 
+ *			Authors: Jean Le Feuvre
  *			Copyright (c) Telecom ParisTech 2000-2012
  *					All rights reserved
  *
@@ -36,7 +36,7 @@
 */
 
 /*events*/
-enum {
+typedef enum {
 
 	/******************************************************
 
@@ -116,50 +116,37 @@ enum {
 	/*pseudo-event, only used in LASeR coding*/
 	GF_EVENT_EXECUTION_TIME,
 
-	/*MediaAccess events - cf http://www.w3.org/TR/MediaAccessEvents*/
-#if 0
-	GF_EVENT_MEDIA_BEGIN_SESSION_SETUP,
-	GF_EVENT_MEDIA_END_SESSION_SETUP,
-	GF_EVENT_MEDIA_DATA_REQUEST,
-	GF_EVENT_MEDIA_PLAYABLE,
-	GF_EVENT_MEDIA_NOT_PLAYABLE,
-	GF_EVENT_MEDIA_DATA_PROGRESS,
-	GF_EVENT_MEDIA_END_OF_DATA,
-	GF_EVENT_MEDIA_STOP,
-	GF_EVENT_MEDIA_ERROR,
-#endif
-
 	/*HTML5 media events*/
-
 	GF_EVENT_MEDIA_SETUP_BEGIN,	/*not HTML5 but should be :)*/
 	GF_EVENT_MEDIA_SETUP_DONE,	/*not HTML5 but should be :)*/
 	GF_EVENT_MEDIA_LOAD_START,
 	GF_EVENT_MEDIA_LOAD_DONE,	/*not HTML5 but should be :)*/
-	GF_EVENT_MEDIA_PROGRESS, 
-	GF_EVENT_MEDIA_SUSPEND, 
-	GF_EVENT_MEDIA_EMPTIED, 
-	GF_EVENT_MEDIA_STALLED, 
-	GF_EVENT_MEDIA_LOADED_METADATA, 
-	GF_EVENT_MEDIA_LODADED_DATA, 
-	GF_EVENT_MEDIA_CANPLAY, 
-	GF_EVENT_MEDIA_CANPLAYTHROUGH, 
-	GF_EVENT_MEDIA_PLAYING, 
-	GF_EVENT_MEDIA_WAITING, 
-	GF_EVENT_MEDIA_SEEKING, 
-	GF_EVENT_MEDIA_SEEKED, 
-	GF_EVENT_MEDIA_ENDED, 
-	GF_EVENT_MEDIA_DURATION_CHANGED, 
-	GF_EVENT_MEDIA_TIME_UPDATE, 
-	GF_EVENT_MEDIA_RATECHANGE, 
-	GF_EVENT_MEDIA_VOLUME_CHANGED, 
+	GF_EVENT_MEDIA_PROGRESS,
+	GF_EVENT_MEDIA_SUSPEND,
+	GF_EVENT_MEDIA_EMPTIED,
+	GF_EVENT_MEDIA_STALLED,
+	GF_EVENT_MEDIA_LOADED_METADATA,
+	GF_EVENT_MEDIA_LODADED_DATA,
+	GF_EVENT_MEDIA_CANPLAY,
+	GF_EVENT_MEDIA_CANPLAYTHROUGH,
+	GF_EVENT_MEDIA_PLAYING,
+	GF_EVENT_MEDIA_WAITING,
+	GF_EVENT_MEDIA_SEEKING,
+	GF_EVENT_MEDIA_SEEKED,
+	GF_EVENT_MEDIA_ENDED,
+	GF_EVENT_MEDIA_DURATION_CHANGED,
+	GF_EVENT_MEDIA_TIME_UPDATE,
+	GF_EVENT_MEDIA_RATECHANGE,
+	GF_EVENT_MEDIA_VOLUME_CHANGED,
 
 	GF_EVENT_HTML_MSE_SOURCE_OPEN,
 	GF_EVENT_HTML_MSE_SOURCE_ENDED,
 	GF_EVENT_HTML_MSE_SOURCE_CLOSE,
-	GF_EVENT_HTML_MSE_APPEND_START,
-	GF_EVENT_HTML_MSE_APPEND_END,
-	GF_EVENT_HTML_MSE_APPEND_ERROR,
-	GF_EVENT_HTML_MSE_APPEND_ABORT,
+	GF_EVENT_HTML_MSE_UPDATE_START,
+	GF_EVENT_HTML_MSE_UPDATE,
+	GF_EVENT_HTML_MSE_UPDATE_END,
+	GF_EVENT_HTML_MSE_UPDATE_ERROR,
+	GF_EVENT_HTML_MSE_UPDATE_ABORT,
 	GF_EVENT_HTML_MSE_ADD_SOURCE_BUFFER,
 	GF_EVENT_HTML_MSE_REMOVE_SOURCE_BUFFER,
 
@@ -197,20 +184,22 @@ enum {
 		if scene size hasn't changed (seeking or other) this event is not sent
 	*/
 	GF_EVENT_SCENE_SIZE,
-	GF_EVENT_SHOWHIDE,	/*window show/hide (minimized or other). This is also sent to the user to signal focus switch in fullscreen*/
+	GF_EVENT_SHOWHIDE,	/*window show/hide (minimized or other). */
+	GF_EVENT_SHOWHIDE_NOTIF,	/*window has been show/hide (minimized or other). This is sent to the user to signal focus switch in fullscreen*/
 	GF_EVENT_SET_CURSOR,	/*set mouse cursor*/
 	GF_EVENT_SET_CAPTION,	/*set window caption*/
 	GF_EVENT_MOVE,		/*move window*/
+	GF_EVENT_MOVE_NOTIF,		/*move window*/
 	GF_EVENT_REFRESH, /*window needs repaint (whenever needed, eg restore, hide->show, background refresh, paint)*/
-	GF_EVENT_QUIT,	/*window is being closed*/
+	GF_EVENT_QUIT,	/*app is being closed - associated structure is evt.message to carry any potential reason for quiting*/
 	/*video hw setup message:
 		- when sent from gpac to plugin, indicates that the plugin should re-setup hardware context due to a window resize:
 			* for 2D output, this means resizing the backbuffer if needed (depending on HW constraints)
 			* for 3D output, this means re-setup of OpenGL context (depending on HW constraints). Depending on windowing systems
 			and implementations, it could be possible to resize a window without destroying the GL context.
 
-		- when sent from plugin to gpac, indicates that hardware resources must be resetup before next render step (this is mainly
-		due to discard all openGL textures and cached objects)
+		- when sent from plugin to gpac, indicates that hardware has been setup.
+		- when sent from gpac to user, indicate aspect ratio has been modified and video output is ready
 	*/
 	GF_EVENT_VIDEO_SETUP,
 	/*queries the list of system colors - only exchanged between compositor and video output*/
@@ -237,14 +226,24 @@ enum {
 	GF_EVENT_MIGRATE, /*indicates a session migration request*/
 	GF_EVENT_DISCONNECT, /*indicates the current url should be disconnected*/
 	GF_EVENT_RESOLUTION, /*indicates the screen resolution has changed*/
-	GF_EVENT_OPENFILE,
-    /* Events for Keyboad */
-    GF_EVENT_TEXT_EDITING_START,
-    GF_EVENT_TEXT_EDITING_END
-};
+	GF_EVENT_DROPFILE,
+	/* Events for Keyboad */
+	GF_EVENT_TEXT_EDITING_START,
+	GF_EVENT_TEXT_EDITING_END,
+
+	GF_EVENT_QUALITY_SWITCHED,
+	GF_EVENT_TIMESHIFT_UPDATE,
+	GF_EVENT_TIMESHIFT_OVERFLOW,
+	GF_EVENT_TIMESHIFT_UNDERRUN,
+	GF_EVENT_MAIN_ADDON_STATE,
+
+	GF_EVENT_FROM_SERVICE,
+
+	GF_EVENT_ADDON_DETECTED,
+} GF_EventType;
 
 /*GPAC/DOM3 key codes*/
-enum {
+typedef enum {
 	GF_KEY_UNIDENTIFIED = 0,
 	GF_KEY_ACCEPT = 1, /* "Accept"    The Accept (Commit) key.*/
 	GF_KEY_AGAIN, /* "Again"  The Again key.*/
@@ -451,7 +450,7 @@ enum {
 	GF_KEY_EPG, /*EPG*/
 	GF_KEY_RECORD, /*Record*/
 	GF_KEY_BEGINPAGE, /*BeginPage*/
-    /* end STB */
+	/* end STB */
 
 	/*non-dom keys, used in LASeR*/
 	GF_KEY_CELL_SOFT1,	/*soft1 key of cell phones*/
@@ -459,11 +458,11 @@ enum {
 
 	/*for joystick handling*/
 	GF_KEY_JOYSTICK
-};
+} GF_KeyCode;
 
 
 /*key modifiers state - set by terminal (not set by video driver)*/
-enum
+typedef enum
 {
 	GF_KEY_MOD_SHIFT = (1),
 	GF_KEY_MOD_CTRL = (1<<2),
@@ -472,7 +471,7 @@ enum
 	GF_KEY_EXT_NUMPAD = (1<<4),
 	GF_KEY_EXT_LEFT = (1<<5),
 	GF_KEY_EXT_RIGHT = (1<<6)
-};
+} GF_KeyModifier;
 
 /*sensor signaling*/
 enum
@@ -501,10 +500,10 @@ enum
 
 enum
 {
+	//regular even codes
+	GF_EVT_REGULAR = 0,
 	/*events forwarded from MPEG-2 stack*/
-	GF_EVT_FORWARDED_MPEG2 = 0,
-	/*events forwarded from RTP/RTSP/IP stack (not used yet)*/
-	GF_EVT_FORWARDED_RTP_RTSP
+	GF_EVT_MPEG2 = 1,
 };
 
 #endif
