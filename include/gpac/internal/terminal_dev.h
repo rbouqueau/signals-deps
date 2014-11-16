@@ -230,7 +230,6 @@ struct _scene
 
 	u32 addon_position, addon_size_factor;
 
-	GF_AddonMedia *active_addon;
 	GF_List *declared_addons;
 	//set when content is replaced by an addon (DASH PVR mode)
 	Bool main_addon_selected;
@@ -540,6 +539,7 @@ struct _object_clock
 	s32 drift;
 	u32 data_timeout;
 	Bool probe_ocr;
+	Bool broken_pcr;
 	u32 last_TS_rendered;
 	u32 service_id;
 
@@ -715,9 +715,10 @@ struct _es_channel
 
 	u32 resync_drift;
 	s32 prev_pcr_diff;
+	u64 last_pcr;
 
 	/*TSs as received from network - these are used for cache storage*/
-	u64 net_dts, net_cts;
+	u64 net_dts, net_cts, sender_ntp;
 
 	Bool last_au_was_seek;
 	Bool no_timestamps;
@@ -1031,9 +1032,10 @@ struct _od_manager
 	Bool scalable_addon;
 
 	//for a regular ODM, this indicates that the current scalable_odm associated
-	struct _od_manager *scalable_odm;
+	struct _od_manager *upper_layer_odm;
+	//for a scalable ODM, this indicates the lower layer odm associated
+	struct _od_manager *lower_layer_odm;
 };
-
 
 GF_ObjectManager *gf_odm_new();
 void gf_odm_del(GF_ObjectManager *ODMan);
@@ -1091,7 +1093,7 @@ void gf_odm_signal_eos(GF_ObjectManager *odm);
 void gf_odm_reset_media_control(GF_ObjectManager *odm, Bool signal_reset);
 
 /*GF_MediaObject: link between real object manager and scene. although there is a one-to-one mapping between a
-MediaObject and an ObjectManager, we have to keep them seperated in order to handle OD remove commands which destroy
+MediaObject and an ObjectManager, we have to keep them separated in order to handle OD remove commands which destroy
 ObjectManagers. */
 struct _mediaobj
 {

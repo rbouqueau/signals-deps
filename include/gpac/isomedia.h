@@ -213,6 +213,7 @@ enum
 	GF_ISOM_SUBTYPE_3GP_DIMS	= GF_4CC( 'd', 'i', 'm', 's' ),
 
 	GF_ISOM_SUBTYPE_AC3			= GF_4CC( 'a', 'c', '-', '3' ),
+	GF_ISOM_SUBTYPE_MP3			= GF_4CC( '.', 'm', 'p', '3' ),
 
 	GF_ISOM_SUBTYPE_LSR1		= GF_4CC( 'l', 's', 'r', '1' ),
 	GF_ISOM_SUBTYPE_WVTT		= GF_4CC( 'w', 'v', 't', 't' ),
@@ -356,7 +357,7 @@ GF_Err gf_isom_last_error(GF_ISOFile *the_file);
 u32 gf_isom_probe_file(const char *fileName);
 
 /*Opens an isoMedia File.
-tmp_dir: for the 2 edit modes only, specifies a location for temp file. If NULL, the librairy will use the default
+tmp_dir: for the 2 edit modes only, specifies a location for temp file. If NULL, the library will use the default
 OS temporary file management schemes.*/
 GF_ISOFile *gf_isom_open(const char *fileName, u32 OpenMode, const char *tmp_dir);
 
@@ -755,8 +756,12 @@ you musty pass (userData != NULL && *userData=NULL)*/
 GF_Err gf_isom_get_user_data(GF_ISOFile *the_file, u32 trackNumber, u32 UserDataType, bin128 UUID, u32 UserDataIndex, char **userData, u32 *userDataSize);
 
 
-/*gets 3char media language code - @three_char_code must be at least 4 char long*/
-GF_Err gf_isom_get_media_language(GF_ISOFile *the_file, u32 trackNumber, char *three_char_code);
+/*gets the media language code (3 chars if old files, longer if BCP-47 */
+GF_Err gf_isom_get_media_language(GF_ISOFile *the_file, u32 trackNumber, char **lang);
+
+/* gets the i-th track kind (0-based) */
+u32 gf_isom_get_track_kind_count(GF_ISOFile *the_file, u32 trackNumber);
+GF_Err gf_isom_get_track_kind(GF_ISOFile *the_file, u32 trackNumber, u32 index, char **scheme, char **value);
 
 /*Unknown sample description*/
 typedef struct
@@ -865,7 +870,10 @@ GF_Err gf_isom_set_track_id(GF_ISOFile *the_file, u32 trackNumber, u32 trackID);
 GF_Err gf_isom_rewrite_track_dependencies(GF_ISOFile *movie, u32 trackNumber);
 
 /*Add samples to a track. Use streamDescriptionIndex to specify the desired stream (if several)*/
-GF_Err gf_isom_add_sample(GF_ISOFile *the_file, u32 trackNumber, u32 StreamDescriptionIndex, GF_ISOSample *sample);
+GF_Err gf_isom_add_sample(GF_ISOFile *the_file, u32 trackNumber, u32 StreamDescriptionIndex, const GF_ISOSample *sample);
+
+//copies all sample dependency, subSample and sample group information from the given sampleNumber in source file to the last added sample in dest file
+GF_Err gf_isom_copy_sample_info(GF_ISOFile *dst, u32 dst_track, GF_ISOFile *src, u32 src_track, u32 sampleNumber);
 
 /*Add sync shadow sample to a track.
 - There must be a regular sample with the same DTS.
@@ -942,6 +950,11 @@ GF_Err gf_isom_set_copyright(GF_ISOFile *the_file, const char *threeCharCode, ch
 
 /*deletes copyright (1-based indexes)*/
 GF_Err gf_isom_remove_copyright(GF_ISOFile *the_file, u32 index);
+
+/*add a kind type to the track */
+GF_Err gf_isom_add_track_kind(GF_ISOFile *movie, u32 trackNumber, const char *schemeURI, const char *value);
+/*removes a kind type to the track, all if NULL params */
+GF_Err gf_isom_remove_track_kind(GF_ISOFile *movie, u32 trackNumber, const char *schemeURI, const char *value);
 
 /*changes the handler type of the media*/
 GF_Err gf_isom_set_media_type(GF_ISOFile *movie, u32 trackNumber, u32 new_type);
@@ -1074,8 +1087,8 @@ GF_Err gf_isom_modify_cts_offset(GF_ISOFile *the_file, u32 trackNumber, u32 samp
 /*remove CTS offset table (used for B-frames)*/
 GF_Err gf_isom_remove_cts_info(GF_ISOFile *the_file, u32 trackNumber);
 
-/*set 3char code media language*/
-GF_Err gf_isom_set_media_language(GF_ISOFile *the_file, u32 trackNumber, char *three_char_code);
+/*set 3-char or BCP-47 code media language*/
+GF_Err gf_isom_set_media_language(GF_ISOFile *the_file, u32 trackNumber, char *code);
 
 /*removes given stream description*/
 GF_Err gf_isom_remove_sample_description(GF_ISOFile *the_file, u32 trackNumber, u32 streamDescIndex);
@@ -1276,7 +1289,7 @@ fragment media data for all tracks*/
 GF_Err gf_isom_start_fragment(GF_ISOFile *movie, Bool moof_first);
 
 /*starts a new segment in the file. If SegName is given, the output will be written in the SegName file. If memory_mode is set, all samples writing is done in memory rather than on disk*/
-GF_Err gf_isom_start_segment(GF_ISOFile *movie, char *SegName, Bool memory_mode);
+GF_Err gf_isom_start_segment(GF_ISOFile *movie, const char *SegName, Bool memory_mode);
 
 /*sets the baseMediaDecodeTime of the first sample of the given track*/
 GF_Err gf_isom_set_traf_base_media_decode_time(GF_ISOFile *movie, u32 TrackID, u64 decode_time);
@@ -1335,7 +1348,7 @@ MUST be provided (in case of regular tracks, this was computed internally by the
 
 */
 
-GF_Err gf_isom_fragment_add_sample(GF_ISOFile *the_file, u32 TrackID, GF_ISOSample *sample,
+GF_Err gf_isom_fragment_add_sample(GF_ISOFile *the_file, u32 TrackID, const GF_ISOSample *sample,
                                    u32 StreamDescriptionIndex,
                                    u32 Duration, u8 PaddingBits, u16 DegradationPriority, Bool redundantCoding);
 

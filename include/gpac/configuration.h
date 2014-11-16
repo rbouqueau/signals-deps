@@ -50,7 +50,9 @@
 #define GPAC_HAS_SPIDERMONKEY
 #ifdef GPAC_CONFIG_DARWIN
 #define MOZILLA_1_8_BRANCH
+#ifndef XP_UNIX
 #define XP_UNIX
+#endif
 #endif
 
 /*libjpeg enabled*/
@@ -65,14 +67,19 @@
 #if defined(GPAC_CONFIG_DARWIN) && defined(GPAC_IPHONE)
 
 #define GPAC_USE_OGL_ES
-#define GPAC_FIXED_POINT
+//#define GPAC_FIXED_POINT
 #define GPAC_HAS_GLU
 
 /*lazy definition of extra libs for iOS*/
 #define GPAC_HAS_FAAD
-//#define GPAC_HAS_MAD
+#define GPAC_HAS_MAD
+#define GPAC_HAS_FFMPEG
 #define GPAC_HAS_SDL
 #define GPAC_HAS_FREETYPE
+
+#ifndef XP_UNIX
+#define XP_UNIX
+#endif
 
 #endif //end iOS flags
 
@@ -243,7 +250,7 @@
 //#define GPAC_DISABLE_ISOM_FRAGMENTS
 
 /*disables scene graph */
-//GPAC_DISABLE_SCENEGRAPH
+//#define GPAC_DISABLE_SCENEGRAPH
 
 /*disables scene graph textual dump*/
 //#define GPAC_DISABLE_SCENE_DUMP

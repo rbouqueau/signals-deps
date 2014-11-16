@@ -114,6 +114,7 @@ enum
 	GF_ISOM_BOX_TYPE_CRHD	= GF_4CC( 'c', 'r', 'h', 'd' ),
 	GF_ISOM_BOX_TYPE_CTTS	= GF_4CC( 'c', 't', 't', 's' ),
 	GF_ISOM_BOX_TYPE_CPRT	= GF_4CC( 'c', 'p', 'r', 't' ),
+	GF_ISOM_BOX_TYPE_KIND	= GF_4CC( 'k', 'i', 'n', 'd' ),
 	GF_ISOM_BOX_TYPE_CHPL	= GF_4CC( 'c', 'h', 'p', 'l' ),
 	GF_ISOM_BOX_TYPE_URL	= GF_4CC( 'u', 'r', 'l', ' ' ),
 	GF_ISOM_BOX_TYPE_URN	= GF_4CC( 'u', 'r', 'n', ' ' ),
@@ -129,6 +130,7 @@ enum
 	GF_ISOM_BOX_TYPE_HMHD	= GF_4CC( 'h', 'm', 'h', 'd' ),
 	GF_ISOM_BOX_TYPE_HINT	= GF_4CC( 'h', 'i', 'n', 't' ),
 	GF_ISOM_BOX_TYPE_MDIA	= GF_4CC( 'm', 'd', 'i', 'a' ),
+	GF_ISOM_BOX_TYPE_ELNG	= GF_4CC( 'e', 'l', 'n', 'g' ),
 	GF_ISOM_BOX_TYPE_MDAT	= GF_4CC( 'm', 'd', 'a', 't' ),
 	GF_ISOM_BOX_TYPE_MDHD	= GF_4CC( 'm', 'd', 'h', 'd' ),
 	GF_ISOM_BOX_TYPE_MINF	= GF_4CC( 'm', 'i', 'n', 'f' ),
@@ -411,6 +413,8 @@ enum
 	GF_ISOM_BOX_UUID_TENC	= GF_4CC( 'T', 'E', 'N', 'C' ),
 	GF_ISOM_BOX_UUID_TFRF	= GF_4CC( 'T', 'F', 'R', 'F' ),
 	GF_ISOM_BOX_UUID_TFXD	= GF_4CC( 'T', 'F', 'X', 'D' ),
+
+	GF_ISOM_BOX_TYPE_MP3	= GF_4CC( '.', 'm', 'p', '3' ),
 };
 
 
@@ -611,6 +615,12 @@ typedef struct __tag_media_box
 	struct __tag_media_info_box *information;
 	u64 BytesMissing;
 } GF_MediaBox;
+
+typedef struct
+{
+	GF_ISOM_FULL_BOX
+	char *extended_language;
+} GF_ExtendedLanguageBox;
 
 typedef struct
 {
@@ -1269,6 +1279,7 @@ typedef struct __tag_media_info_box
 	u32 dataEntryIndex;
 } GF_MediaInformationBox;
 
+GF_Err stbl_AppendDependencyType(GF_SampleTableBox *stbl, u32 dependsOn, u32 dependedOn, u32 redundant);
 
 typedef struct
 {
@@ -1283,6 +1294,13 @@ typedef struct
 	char packedLanguageCode[4];
 	char *notice;
 } GF_CopyrightBox;
+
+typedef struct
+{
+	GF_ISOM_FULL_BOX
+	char *schemeURI;
+	char *value;
+} GF_KindBox;
 
 
 typedef struct
@@ -2671,8 +2689,8 @@ GF_Err Track_SetStreamDescriptor(GF_TrackBox *trak, u32 StreamDescriptionIndex, 
 u8 RequestTrack(GF_MovieBox *moov, u32 TrackID);
 /*Track-Media setup*/
 GF_Err NewMedia(GF_MediaBox **mdia, u32 MediaType, u32 TimeScale);
-GF_Err Media_ParseODFrame(GF_MediaBox *mdia, GF_ISOSample *sample, GF_ISOSample **od_samp);
-GF_Err Media_AddSample(GF_MediaBox *mdia, u64 data_offset, GF_ISOSample *sample, u32 StreamDescIndex, u32 syncShadowNumber);
+GF_Err Media_ParseODFrame(GF_MediaBox *mdia, const GF_ISOSample *sample, GF_ISOSample **od_samp);
+GF_Err Media_AddSample(GF_MediaBox *mdia, u64 data_offset, const GF_ISOSample *sample, u32 StreamDescIndex, u32 syncShadowNumber);
 GF_Err Media_CreateDataRef(GF_DataReferenceBox *dref, char *URLname, char *URNname, u32 *dataRefIndex);
 /*update a media sample. ONLY in edit mode*/
 GF_Err Media_UpdateSample(GF_MediaBox *mdia, u32 sampleNumber, GF_ISOSample *sample, Bool data_only);
@@ -2980,6 +2998,7 @@ GF_Box *dinf_New();
 GF_Box *url_New();
 GF_Box *urn_New();
 GF_Box *cprt_New();
+GF_Box *kind_New();
 GF_Box *chpl_New();
 GF_Box *hdlr_New();
 GF_Box *iods_New();
@@ -3031,6 +3050,7 @@ void url_del(GF_Box *);
 void urn_del(GF_Box *);
 void chpl_del(GF_Box *);
 void cprt_del(GF_Box *);
+void kind_del(GF_Box *);
 void hdlr_del(GF_Box *);
 void iods_del(GF_Box *);
 void trak_del(GF_Box *);
@@ -3082,6 +3102,7 @@ GF_Err url_Write(GF_Box *s, GF_BitStream *bs);
 GF_Err urn_Write(GF_Box *s, GF_BitStream *bs);
 GF_Err chpl_Write(GF_Box *s, GF_BitStream *bs);
 GF_Err cprt_Write(GF_Box *s, GF_BitStream *bs);
+GF_Err kind_Write(GF_Box *s, GF_BitStream *bs);
 GF_Err hdlr_Write(GF_Box *s, GF_BitStream *bs);
 GF_Err iods_Write(GF_Box *s, GF_BitStream *bs);
 GF_Err trak_Write(GF_Box *s, GF_BitStream *bs);
@@ -3133,6 +3154,7 @@ GF_Err url_Size(GF_Box *);
 GF_Err urn_Size(GF_Box *);
 GF_Err chpl_Size(GF_Box *);
 GF_Err cprt_Size(GF_Box *);
+GF_Err kind_Size(GF_Box *);
 GF_Err hdlr_Size(GF_Box *);
 GF_Err iods_Size(GF_Box *);
 GF_Err trak_Size(GF_Box *);
@@ -3184,6 +3206,7 @@ GF_Err url_Read(GF_Box *s, GF_BitStream *bs);
 GF_Err urn_Read(GF_Box *s, GF_BitStream *bs);
 GF_Err chpl_Read(GF_Box *s, GF_BitStream *bs);
 GF_Err cprt_Read(GF_Box *s, GF_BitStream *bs);
+GF_Err kind_Read(GF_Box *s, GF_BitStream *bs);
 GF_Err hdlr_Read(GF_Box *s, GF_BitStream *bs);
 GF_Err iods_Read(GF_Box *s, GF_BitStream *bs);
 GF_Err trak_Read(GF_Box *s, GF_BitStream *bs);
@@ -3749,6 +3772,7 @@ GF_Err dinf_dump(GF_Box *a, FILE * trace);
 GF_Err url_dump(GF_Box *a, FILE * trace);
 GF_Err urn_dump(GF_Box *a, FILE * trace);
 GF_Err cprt_dump(GF_Box *a, FILE * trace);
+GF_Err kind_dump(GF_Box *a, FILE * trace);
 GF_Err hdlr_dump(GF_Box *a, FILE * trace);
 GF_Err iods_dump(GF_Box *a, FILE * trace);
 GF_Err trak_dump(GF_Box *a, FILE * trace);
@@ -4210,6 +4234,13 @@ GF_Err adaf_Read(GF_Box *s, GF_BitStream *bs);
 GF_Err adaf_Write(GF_Box *s, GF_BitStream *bs);
 GF_Err adaf_Size(GF_Box *s);
 GF_Err adaf_dump(GF_Box *a, FILE * trace);
+
+GF_Box *elng_New();
+void elng_del(GF_Box *s);
+GF_Err elng_Read(GF_Box *s, GF_BitStream *bs);
+GF_Err elng_Write(GF_Box *s, GF_BitStream *bs);
+GF_Err elng_Size(GF_Box *s);
+GF_Err elng_dump(GF_Box *a, FILE * trace);
 
 #endif /*GPAC_DISABLE_ISOM*/
 

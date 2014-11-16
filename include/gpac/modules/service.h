@@ -365,6 +365,7 @@ typedef struct __netinfocom
 	u32 command_type;
 	/*currently NULL only*/
 	LPNETCHANNEL on_channel;
+	u32 service_id;
 	/*packed trackNumber(16 bits)/totaltrack(16 bits)*/
 	u32 track_info;
 	u32 genre;
@@ -375,6 +376,10 @@ typedef struct __netinfocom
 	const char *name;
 	const char *writer;
 	const char *provider;
+	//as in MPEG_DASH role
+	const char *role;
+	const char *accessibility;
+	const char *rating;
 } GF_NetComInfo;
 
 /*GF_NET_SERVICE_HAS_AUDIO*/
