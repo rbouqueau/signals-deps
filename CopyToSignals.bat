@@ -1,18 +1,18 @@
 @echo on
 set BATDIR="%~dp0"
-set LIBPATH=%1\modules\extra_lib
+set LIBPATH=%1\extra_lib
 
 REM create dirs
 mkdir %1\bin\win32\Debug
 mkdir %1\bin\win32\Release
 mkdir %1\bin\x64\Debug
 mkdir %1\bin\x64\Release
-mkdir %1\modules\extra_lib
-mkdir %1\modules\extra_lib\include
-mkdir %1\modules\extra_lib\lib\win32\Debug
-mkdir %1\modules\extra_lib\lib\win32\Release
-mkdir %1\modules\extra_lib\lib\x64\Debug
-mkdir %1\modules\extra_lib\lib\x64\Release
+mkdir %1\extra_lib
+mkdir %1\extra_lib\include
+mkdir %1\extra_lib\lib\win32\Debug
+mkdir %1\extra_lib\lib\win32\Release
+mkdir %1\extra_lib\lib\x64\Debug
+mkdir %1\extra_lib\lib\x64\Release
 
 REM include
 xcopy /i /e /q /y %BATDIR%\include %LIBPATH%\include
