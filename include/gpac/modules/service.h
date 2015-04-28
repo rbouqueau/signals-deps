@@ -102,6 +102,8 @@ typedef enum
 	GF_NET_SERVICE_INFO,
 	/*checks if there is an audio stream in the service - term->net only*/
 	GF_NET_SERVICE_HAS_AUDIO,
+	/*checks if the service can support reverse playback (speed<0) - term->service only*/
+	GF_NET_SERVICE_CAN_REVERSE_PLAYBACK,
 	/*send by the terminal to indicate the channel(s) on this service need more data - term->net only*/
 	GF_NET_SERVICE_FLUSH_DATA,
 
@@ -251,7 +253,7 @@ typedef struct
 	u32 command_type;
 	LPNETCHANNEL on_channel;
 	//time in sec in the timeshift buffer - 0 means live point
-	u32 time;
+	Double time;
 } GF_NetComTimeShift;
 
 
@@ -437,6 +439,10 @@ typedef struct
 	const char *next_url_init_or_switch_segment;
 	u64 switch_start_range, switch_end_range;
 
+	/*set to key URL for current segment, or NULL if none*/
+	const char *key_url;
+	/*set to key IV for current segment, or NULL if none*/
+	bin128 *key_IV;
 
 	Bool has_next;
 	/*module->proxy: indicates that currently downloaded segment should be checked.

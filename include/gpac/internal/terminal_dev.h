@@ -228,11 +228,16 @@ struct _scene
 	GF_List *keynavigators;
 #endif
 
+	Bool disable_hitcoord_notif;
+
 	u32 addon_position, addon_size_factor;
 
 	GF_List *declared_addons;
 	//set when content is replaced by an addon (DASH PVR mode)
 	Bool main_addon_selected;
+	u32 sys_clock_at_main_activation, obj_clock_at_main_activation;
+
+	Bool pause_at_first_frame;
 };
 
 GF_Scene *gf_scene_new(GF_Scene *parentScene);
@@ -264,14 +269,17 @@ void gf_scene_regenerate(GF_Scene *scene);
 void gf_scene_select_object(GF_Scene *scene, GF_ObjectManager *odm);
 /*restarts dynamic scene from given time: scene graph is not reseted, objects are just restarted
 instead of closed and reopened. If a media control is present on inline, from_time is overriden by MC range*/
-void gf_scene_restart_dynamic(GF_Scene *scene, s64 from_time, Bool restart_only);
+void gf_scene_restart_dynamic(GF_Scene *scene, s64 from_time, Bool restart_only, Bool disable_addon_check);
 
 /*exported for compositor: handles filtering of "self" parameter indicating anchor only acts on container inline scene
 not root one. Returns 1 if handled (cf user.h, navigate event)*/
 Bool gf_scene_process_anchor(GF_Node *caller, GF_Event *evt);
 void gf_scene_force_size_to_video(GF_Scene *scene, GF_MediaObject *mo);
 
-Bool gf_scene_check_clocks(GF_ClientService *ns, GF_Scene *scene);
+//check clock status. 
+//If @check_buffering is 0, returns 1 if all clocks have seen eos, 0 otherwise
+//If @check_buffering is 1, returns 1 if no clock is buffering, 0 otheriwse
+Bool gf_scene_check_clocks(GF_ClientService *ns, GF_Scene *scene, Bool check_buffering);
 
 void gf_scene_notify_event(GF_Scene *scene, u32 event_type, GF_Node *n, void *dom_evt, GF_Err code, Bool no_queueing);
 
@@ -279,7 +287,8 @@ void gf_scene_mpeg4_inline_restart(GF_Scene *scene);
 
 GF_Node *gf_scene_get_subscene_root(GF_Node *inline_node);
 
-void gf_scene_select_main_addon(GF_Scene *scene, GF_ObjectManager *odm, Bool set_on);
+void gf_scene_select_main_addon(GF_Scene *scene, GF_ObjectManager *odm, Bool set_on, u32 current_clock_time);
+void gf_scene_reset_addons(GF_Scene *scene);
 
 #ifndef GPAC_DISABLE_VRML
 
@@ -450,6 +459,11 @@ struct _tag_terminal
 	u32 bench_mode;
 
 	u32 prefered_audio_codec_oti;
+
+	u32 low_latency_buffer_max;
+
+	u32 nb_calls_in_event_proc;
+	u32 disconnect_request_status;
 };
 
 
@@ -658,6 +672,8 @@ struct _es_channel
 	u32 stream_state;
 	/*the AU in reception is RAP*/
 	Bool IsRap;
+	/*the AU in reception is only need for seeking*/
+	Bool SeekFlag;
 	/*signal that next AU is an AU start*/
 	Bool NextIsAUStart;
 	/*if codec resilient, packet drops are not considered as fatal for AU reconstruction (eg no wait for RAP)*/
@@ -806,6 +822,9 @@ enum
 	/*set when codec is identified as RAW, meaning all AU comming from the network are directly
 	dispatched to the composition memory*/
 	GF_ESM_CODEC_IS_RAW_MEDIA = 1<<3,
+
+	/*set when input channels have very low buffering requirement, in which case the codec has to discard all possible late data*/
+	GF_ESM_CODEC_IS_LOW_LATENCY = 1<<4,
 };
 
 struct _generic_codec
@@ -1136,6 +1155,12 @@ struct _mediaobj
 	Reset upon creation of the decoder.
 	*/
 	void *node_ptr;
+
+
+	/*currently valid properties of the object*/
+	u32 width, height, stride, pixel_ar, pixelformat;
+	Bool is_flipped;
+	u32 sample_rate, num_channels, bits_per_sample, channel_config;
 };
 
 GF_MediaObject *gf_mo_new();
@@ -1175,10 +1200,12 @@ void gf_scene_set_addon_layout_info(GF_Scene *scene, u32 position, u32 size_fact
 void gf_scene_register_associated_media(GF_Scene *scene, GF_AssociatedContentLocation *addon_info);
 void gf_scene_notify_associated_media_timeline(GF_Scene *scene, GF_AssociatedContentTiming *addon_time);
 //returns media time in sec for the addon - timestamp_based is set to 1 if no timeline has been found (eg sync is based on direct timestamp comp)
-Double gf_scene_adjust_time_for_addon(GF_Scene *scene, Double clock_time, GF_AddonMedia *addon, u32 *timestamp_based);
-u64 gf_scene_adjust_timestamp_for_addon(GF_Scene *scene, u64 orig_ts, GF_AddonMedia *addon);
+Double gf_scene_adjust_time_for_addon(GF_AddonMedia *addon, Double clock_time, u32 *timestamp_based);
+s64 gf_scene_adjust_timestamp_for_addon(GF_AddonMedia *addon, u64 orig_ts);
 void gf_scene_select_scalable_addon(GF_Scene *scene, GF_ObjectManager *odm);
-void gf_scene_check_addon_restart(GF_AddonMedia *addon, u64 cts, u64 dts);
+/*check if the associated addon has to be restarted, based on the timestamp of the main media (used for scalable addons only). Returns 1 if the addon has been restarted*/
+Bool gf_scene_check_addon_restart(GF_AddonMedia *addon, u64 cts, u64 dts);
+
 
 //exported for gpac.js, resumes to main content
 void gf_scene_resume_live(GF_Scene *subscene);
@@ -1222,13 +1249,16 @@ struct _gf_addon_media
 	u32 addon_type;
 };
 
+void gf_scene_toggle_addons(GF_Scene *scene, Bool show_addons);
+
+
+
 GF_Err gf_codec_process_private_media(GF_Codec *codec, u32 TimeAvailable);
 
 
 Bool gf_codec_is_scene_or_image(GF_Codec *codec);
 
 void gf_scene_set_service_id(GF_Scene *scene, u32 service_id);
-void gf_scene_toggle_addons(GF_Scene *scene, Bool show_addons);
 
 #ifdef __cplusplus
 }

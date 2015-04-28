@@ -38,17 +38,17 @@
 
 /*enables GPAC memory tracking in debug mode only*/
 #if defined(DEBUG) || defined(_DEBUG)
-#define GPAC_MEMORY_TRACKING
+//#define GPAC_MEMORY_TRACKING
 #endif
 
-/*SSL enabled - no 64 bit support yet*/
-#if defined(WIN32) && !defined(_WIN64)
+/*SSL enabled*/
+#if defined(WIN32)
 #define GPAC_HAS_SSL
 #endif
 
 /*spidermonkey enabled*/
 #define GPAC_HAS_SPIDERMONKEY
-#ifdef GPAC_CONFIG_DARWIN
+#if defined(GPAC_CONFIG_DARWIN) && !defined(GPAC_IPHONE)
 #define MOZILLA_1_8_BRANCH
 #ifndef XP_UNIX
 #define XP_UNIX
@@ -66,7 +66,7 @@
 //iOS compilation
 #if defined(GPAC_CONFIG_DARWIN) && defined(GPAC_IPHONE)
 
-#define GPAC_USE_OGL_ES
+#define GPAC_USE_GLES1X
 //#define GPAC_FIXED_POINT
 #define GPAC_HAS_GLU
 
@@ -102,8 +102,8 @@
 #define GPAC_ANDROID
 
 #define GPAC_HAS_IPV6
-#define GPAC_USE_OGL_ES
-#define GPAC_FIXED_POINT
+#define GPAC_USE_GLES1X
+//#define GPAC_FIXED_POINT
 
 #undef GPAC_HAS_SPIDERMONKEY
 #undef GPAC_HAS_PNG
@@ -129,8 +129,8 @@
 #error "Only one of GPAC_USE_IGPP and GPAC_USE_IGPP_HP can be defined"
 #endif
 
-#if !defined(GPAC_DISABLE_3D) && !defined(GPAC_USE_TINYGL) && !defined(GPAC_USE_OGL_ES)
-#define GPAC_USE_OGL_ES
+#if !defined(GPAC_DISABLE_3D) && !defined(GPAC_USE_TINYGL) && !defined(GPAC_USE_GLES1X)
+#define GPAC_USE_GLES1X
 #endif
 
 #endif //WinCE flags
@@ -281,6 +281,7 @@
 
 /*disables VOBSUB */
 //#define GPAC_DISABLE_VOBSUB
+
 
 #endif		/*_GF_CONFIG_H_*/
 

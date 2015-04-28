@@ -300,6 +300,8 @@ typedef u8 bin128[16];
 #define GF_EPSILON_FLOAT	FLT_EPSILON
 #define GF_SHORT_MAX		SHRT_MAX
 #define GF_SHORT_MIN		SHRT_MIN
+#define GF_INT_MAX			INT_MAX
+#define GF_INT_MIN			INT_MIN
 
 #ifndef MIN
 #define MIN(X, Y) ((X)<(Y)?(X):(Y))
@@ -325,12 +327,13 @@ typedef enum {
 /*GPAC memory tracking*/
 #if defined(GPAC_MEMORY_TRACKING)
 
-void *gf_mem_malloc(size_t size, char *filename, int line);
-void *gf_mem_calloc(size_t num, size_t size_of, char *filename, int line);
-void *gf_mem_realloc(void *ptr, size_t size, char *filename, int line);
-void gf_mem_free(void *ptr, char *filename, int line);
-char *gf_mem_strdup(const char *str, char *filename, int line);
+void *gf_mem_malloc(size_t size, const char *filename, int line);
+void *gf_mem_calloc(size_t num, size_t size_of, const char *filename, int line);
+void *gf_mem_realloc(void *ptr, size_t size, const char *filename, int line);
+void gf_mem_free(void *ptr, const char *filename, int line);
+char *gf_mem_strdup(const char *str, const char *filename, int line);
 void gf_memory_print(void); /*prints the state of current allocations*/
+u64 gf_memory_size(); /*gets memory allocated in bytes*/
 
 #define gf_free(ptr) gf_mem_free(ptr, __FILE__, __LINE__)
 #define gf_malloc(size) gf_mem_malloc(size, __FILE__, __LINE__)
@@ -340,11 +343,11 @@ void gf_memory_print(void); /*prints the state of current allocations*/
 
 #else
 
-#define gf_malloc malloc
-#define gf_calloc calloc
-#define gf_realloc realloc
-#define gf_free free
-#define gf_strdup strdup
+void* gf_malloc(size_t size);
+void* gf_calloc(size_t num, size_t size_of);
+void* gf_realloc(void *ptr, size_t size);
+void gf_free(void *ptr);
+char* gf_strdup(const char *str);
 
 #endif
 

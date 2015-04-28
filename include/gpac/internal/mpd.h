@@ -41,12 +41,26 @@ typedef struct
 	u32 dummy;
 } GF_MPD_ContentComponent;
 
-/*TODO*/
+
+//some elments are typically overloaded in XML, we keep the attributes / childrne nodes here. The attributes list is NULL if no extensions were found, otherwise it is a list of @GF_XMLAttribute.
+//The children list is NULL if no extensions were found, otherwise it is a list of @GF_XMLNode
+#define MPD_EXTENSIBLE	\
+	GF_List *attributes;	\
+	GF_List *children;	\
+
 typedef struct
 {
+	MPD_EXTENSIBLE
+} GF_MPD_ExtensibleVirtual;
+
+typedef struct
+{
+	MPD_EXTENSIBLE
+
 	char *scheme_id_uri; /*MANDATORY*/
 	char *value;
 	char *id;
+
 } GF_MPD_Descriptor;
 
 /*TODO*/
@@ -85,6 +99,9 @@ typedef struct
 {
 	char *sourceURL;
 	GF_MPD_ByteRange *byte_range;
+
+	//GPAC internal - indicates the URL has already been solved
+	Bool is_resolved;
 } GF_MPD_URL;
 
 typedef struct
@@ -92,6 +109,12 @@ typedef struct
 	u32 num, den;
 } GF_MPD_Fractional;
 
+typedef struct
+{
+	u32 trackID;
+	char *stsd;
+	s64 mediaOffset;
+} GF_MPD_ISOBMFInfo;
 
 #define GF_MPD_SEGMENT_BASE	\
 	u32 timescale;	\
@@ -102,7 +125,7 @@ typedef struct
 	Double availability_time_offset;	\
 	GF_MPD_URL *initialization_segment;	\
 	GF_MPD_URL *representation_index;	\
- 
+
 
 typedef struct
 {
@@ -116,7 +139,7 @@ typedef struct
 	u32 start_number;	\
 	GF_MPD_SegmentTimeline *segment_timeline;	\
 	GF_MPD_URL *bitstream_switching_url;	\
- 
+
 typedef struct
 {
 	GF_MPD_MULTIPLE_SEGMENT_BASE
@@ -129,6 +152,8 @@ typedef struct
 	char *index;
 	GF_MPD_ByteRange *index_range;
 	u64 duration;
+	char *key_url;
+	bin128 key_iv;
 } GF_MPD_SegmentURL;
 
 typedef struct
@@ -181,7 +206,8 @@ typedef enum
 	GF_List *content_protection;	\
 	GF_List *essential_properties;	\
 	GF_List *supplemental_properties;	\
- 
+	GF_List *isobmf_tracks;	\
+
 typedef struct {
 	GF_MPD_COMMON_ATTRIBUTES_ELEMENTS
 } GF_MPD_CommonAttributes;
@@ -203,6 +229,8 @@ typedef struct
 	u32 probe_switch_count;
 	char *init_segment_data;
 	u32 init_segment_size;
+	char *key_url;
+	bin128 key_IV;
 } GF_DASH_RepresentationPlayback;
 
 typedef struct {
@@ -305,6 +333,8 @@ typedef enum {
 } GF_MPD_Type;
 
 typedef struct {
+	MPD_EXTENSIBLE
+
 	char *ID;
 	char *profiles;	/*MANDATORY*/
 	GF_MPD_Type type;
@@ -347,6 +377,9 @@ void gf_mpd_segment_base_free(void *ptr);
 
 void gf_mpd_period_free(void *_item);
 
+GF_Err gf_mpd_write_file(GF_MPD *mpd, char *file_name);
+
+
 typedef struct _gf_file_get GF_FileDownload;
 struct _gf_file_get
 {
@@ -362,5 +395,24 @@ struct _gf_file_get
 /*converts M3U8 to MPD - getter is optional (download will still be processed if NULL)*/
 GF_Err gf_m3u8_to_mpd(const char *m3u8_file, const char *base_url, const char *mpd_file, u32 reload_count, char *mimeTypeForM3U8Segments, Bool do_import, Bool use_mpd_templates, GF_FileDownload *getter);
 
-#endif // _MPD_H_
 
+
+typedef enum
+{
+	GF_MPD_RESOLVE_URL_MEDIA,
+	GF_MPD_RESOLVE_URL_INIT,
+	GF_MPD_RESOLVE_URL_INDEX,
+	//same as GF_MPD_RESOLVE_URL_MEDIA but does not replace $Time$ and $Number$
+	GF_MPD_RESOLVE_URL_MEDIA_TEMPLATE,
+} GF_MPD_URLResolveType;
+
+/*resolves a URL based for a given segment, based on the MPD url, the type of resolution
+	item_index: current downloading index of the segment
+	nb_segments_removed: number of segments removed when pruging the MPD after updates (can be 0). The start number will be offset by this value
+*/
+GF_Err gf_mpd_resolve_url(GF_MPD *mpd, GF_MPD_Representation *rep, GF_MPD_AdaptationSet *set, GF_MPD_Period *period, const char *mpd_url, GF_MPD_URLResolveType resolve_type, u32 item_index, u32 nb_segments_removed, 
+								char **out_url, u64 *out_range_start, u64 *out_range_end, u64 *segment_duration, Bool *is_in_base_url, char **out_key_url, bin128 *key_iv);
+
+
+
+#endif // _MPD_H_

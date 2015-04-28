@@ -267,8 +267,8 @@ typedef struct __gf_dvb_tuner GF_Tuner;
 /*Maximum number of service in a TS*/
 #define GF_M2TS_MAX_SERVICES	65535
 
-/*Maximum size of the buffer in UDP */
-#define UDP_BUFFER_SIZE	0x4000
+/*Maximum size of the buffer in UDP is 200*188 bytes*/
+#define UDP_BUFFER_SIZE	37600
 
 /*returns readable name for given stream type*/
 const char *gf_m2ts_get_stream_name(u32 streamType);
@@ -399,6 +399,7 @@ enum
 	GF_M2TS_TABLE_END		= 1<<1,
 	GF_M2TS_TABLE_FOUND		= 1<<2,
 	GF_M2TS_TABLE_UPDATE	= 1<<3,
+	//both update and repeat flags may be set if data has changed
 	GF_M2TS_TABLE_REPEAT	= 1<<4,
 };
 
@@ -432,6 +433,7 @@ typedef struct __m2ts_demux_table
 
 	GF_List *sections;
 
+	u32 table_size;
 } GF_M2TS_Table;
 
 
@@ -574,7 +576,10 @@ enum
 	GF_M2TS_ES_FIRST_DTS = 1<<17,
 
 	/*flag used to signal next discontinuity on stream should be ignored*/
-	GF_M2TS_ES_IGNORE_NEXT_DISCONTINUITY = 1<<18
+	GF_M2TS_ES_IGNORE_NEXT_DISCONTINUITY = 1<<18,
+
+	/*Flag used by importers/readers to mark streams that have been seen already in PMT process (update/found)*/
+	GF_M2TS_ES_ALREADY_DECLARED = 1<<19
 };
 
 /*Abstract Section/PES stream object, only used for type casting*/
@@ -706,9 +711,13 @@ typedef struct tag_m2ts_pes
 	GF_M2TS_DVB_Subtitling_Descriptor sub;
 	GF_M2TS_MetadataDescriptor *metadata_descriptor;
 
-
+	//pointer to last received temi
 	char *temi_tc_desc;
 	u32 temi_tc_desc_len, temi_tc_desc_alloc_size;
+
+	//last decoded temi (may be one ahead of time as the last received TEMI)
+	GF_M2TS_TemiTimecodeDescriptor temi_tc;
+	Bool temi_pending;
 } GF_M2TS_PES;
 
 /*SDT information object*/
@@ -908,6 +917,9 @@ struct tag_m2ts_demux
 	/* analyser */
 	FILE *pes_out;
 
+
+	Bool prefix_present;
+
 	Bool direct_mpe;
 
 	Bool dvb_h_demux;
@@ -933,7 +945,7 @@ struct tag_m2ts_demux
 	char* dsmcc_root_dir;
 	GF_List* dsmcc_controler;
 
-	Bool segment_switch;
+	Bool abort_parsing;
 	Bool table_reset;
 
 	//duration estimation
@@ -947,6 +959,7 @@ struct tag_m2ts_demux
 GF_M2TS_Demuxer *gf_m2ts_demux_new();
 void gf_m2ts_demux_del(GF_M2TS_Demuxer *ts);
 void gf_m2ts_reset_parsers(GF_M2TS_Demuxer *ts);
+void gf_m2ts_reset_parsers_for_program(GF_M2TS_Demuxer *ts, GF_M2TS_Program *prog);
 GF_ESD *gf_m2ts_get_esd(GF_M2TS_ES *es);
 GF_Err gf_m2ts_set_pes_framing(GF_M2TS_PES *pes, u32 mode);
 u32 gf_m2ts_pes_get_framing_mode(GF_M2TS_PES *pes);
@@ -961,6 +974,8 @@ GF_M2TS_SDT *gf_m2ts_get_sdt_info(GF_M2TS_Demuxer *ts, u32 program_id);
 
 Bool gf_m2ts_crc32_check(char *data, u32 len);
 
+/*aborts parsing of the current data (typically needed when parsing done by a different thread). If force_reset_pes is set, all pending pes data is discarded*/
+void gf_m2ts_abort_parsing(GF_M2TS_Demuxer *ts, Bool force_reset_pes);
 
 
 typedef struct
@@ -1327,9 +1342,6 @@ struct __gf_dvb_tuner {
 	int ts_fd;
 };
 
-
-// DVB buffer size 188x20
-#define DVB_BUFFER_SIZE 3760
 
 #endif //GPAC_HAS_LINUX_DVB
 
