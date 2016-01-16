@@ -238,6 +238,7 @@ struct _scene
 	u32 sys_clock_at_main_activation, obj_clock_at_main_activation;
 
 	Bool pause_at_first_frame;
+	Bool is_live360;
 };
 
 GF_Scene *gf_scene_new(GF_Scene *parentScene);
@@ -560,6 +561,8 @@ struct _object_clock
 	//media time in ms corresponding to the init tmiestamp of the clock
 	u32 media_time_at_init;
 	Bool has_media_time_shift;
+
+	u16 ocr_on_esid;
 };
 
 /*destroys clock*/
@@ -881,6 +884,7 @@ struct _generic_codec
 	u64 total_dec_time, total_iframes_time;
 	u32 max_dec_time, max_iframes_time;
 	u32 first_frame_time, last_frame_time;
+	Bool codec_reset;
 	/*number of frames dropped at the presentation*/
 	u32 nb_dropped;
 	/*we detect if the same image is sent again and again to the decoder (using last_unit_signature)*/
@@ -1182,8 +1186,6 @@ GF_Err gf_odm_post_es_setup(struct _es_channel *ch, struct _generic_codec *dec, 
 */
 void gf_term_attach_service(GF_Terminal *term, GF_InputService *service_hdl);
 
-
-Bool gf_term_send_event(GF_Terminal *term, GF_Event *evt);
 
 /*media access events */
 void gf_term_service_media_event(GF_ObjectManager *odm, GF_EventType event_type);

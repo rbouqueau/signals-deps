@@ -285,19 +285,18 @@ GF_Err gf_media_merge_svc(GF_ISOFile *file, u32 track, Bool mergeAll);
 /* Split SHVC layers */
 GF_Err gf_media_split_shvc(GF_ISOFile *file, u32 track, Bool splitAll, Bool use_extractors);
 
-GF_Err gf_media_split_hevc_tiles(GF_ISOFile *file);
+GF_Err gf_media_split_hevc_tiles(GF_ISOFile *file, Bool use_extractors);
 
 #endif /*GPAC_DISABLE_MEDIA_IMPORT*/
 
 
-#if !defined(GPAC_DISABLE_ISOM_WRITE) && !defined(GPAC_DISABLE_ISOM_FRAGMENTS)
-
-    
+	
 typedef struct
 {
 	char *file_name;
 	char *representationID;
 	char *periodID;
+	Double media_duration;
 	u32 nb_baseURL;
 	char **baseURL;
 	char *xlink;
@@ -351,6 +350,13 @@ typedef enum
 	GF_DASH_DYNAMIC_DEBUG,
 } GF_DashDynamicMode;
 
+typedef enum
+{
+	GF_DASH_CPMODE_ADAPTATION_SET=0,
+	GF_DASH_CPMODE_REPRESENTATION,
+	GF_DASH_CPMODE_BOTH,
+} GF_DASH_ContentLocationMode;
+	
 typedef struct __gf_dash_segmenter GF_DASHSegmenter;
 
 /*Create a new DASH segmenter
@@ -425,11 +431,12 @@ GF_Err gf_dasher_enable_single_file(GF_DASHSegmenter *dasher, Bool enable);
 GF_Err gf_dasher_set_switch_mode(GF_DASHSegmenter *dasher, GF_DashSwitchingMode bitstream_switching);
 /*Sets segment and fragment durations. 
  *	\param dasher the DASH segmenter object
- *	\param default_segment_duration the duration of a dash segment 
+ *	\param default_segment_duration the duration of a dash segment
+ *	\param segment_duration_strict indicated is the duration is strict (otherwise we consider the mean duration)
  *	\param default_fragment_duration the duration of a dash fragment - if 0, same as default_segment_duration
  *	\return error code if any
 */
-GF_Err gf_dasher_set_durations(GF_DASHSegmenter *dasher, Double default_segment_duration, Double default_fragment_duration);
+GF_Err gf_dasher_set_durations(GF_DASHSegmenter *dasher, Double default_segment_duration, Bool segment_duration_strict, Double default_fragment_duration);
 /*Enables spliting at RAP boundaries
  *	\param dasher the DASH segmenter object
  *	\param segments_start_with_rap segments will be split at RAP boundaries
@@ -506,6 +513,12 @@ GF_Err gf_dasher_enable_utc_ref(GF_DASHSegmenter *dasher, Bool insert_utc);
  *	\return error code if any
 */
 GF_Err gf_dasher_enable_real_time(GF_DASHSegmenter *dasher, Bool real_time);
+/*Sets where the  ContentProtection element is inserted in an adaptation set.
+*	\param dasher the DASH segmenter object
+*	\param  ContentProtection element location mode.
+*	\return error code if any
+*/
+GF_Err gf_dasher_set_content_protection_location_mode(GF_DASHSegmenter *dasher, GF_DASH_ContentLocationMode mode);
 /*Sets profile extension as used by DASH-IF and DVB.
  *	\param dasher the DASH segmenter object
  *	\param dash_profile_extension specifies a string of profile extensions, as used by DASH-IF and DVB.
@@ -534,11 +547,10 @@ u32 gf_dasher_next_update_time(GF_DASHSegmenter *dasher);
 
     
     
+#ifndef GPAC_DISABLE_ISOM_FRAGMENTS
 /*save file as fragmented movie*/
 GF_Err gf_media_fragment_file(GF_ISOFile *input, const char *output_file, Double max_duration_sec);
-
-#endif // !defined(GPAC_DISABLE_ISOM_WRITE) && !defined(GPAC_DISABLE_ISOM_FRAGMENTS)
-
+#endif
 
 #ifndef GPAC_DISABLE_MEDIA_EXPORT
 
@@ -566,8 +578,6 @@ enum
 	GF_EXPORT_WEBVTT_META = (1<<8),
 	/*WebVTT metadata format: media data will be embedded in webvtt*/
 	GF_EXPORT_WEBVTT_META_EMBEDDED = (1<<9),
-	/* Experimental Streaming Instructions */
-	GF_EXPORT_SIX = (1<<14),
 
 	/*following ones are real flags*/
 	/*
@@ -583,6 +593,13 @@ enum
 	GF_EXPORT_SVC_LAYER = (1<<12),
 	/* Don't merge identical cues in consecutive samples */
 	GF_EXPORT_WEBVTT_NOMERGE = (1<<13),
+
+	/* Experimental Streaming Instructions */
+	GF_EXPORT_SIX = (1<<14),
+
+	/* Experimental Streaming Instructions */
+	GF_EXPORT_FORCE_EXT = (1<<15),
+
 	/*ony probes extraction format*/
 	GF_EXPORT_PROBE_ONLY = (1<<30),
 	/*when set by user during export, will abort*/

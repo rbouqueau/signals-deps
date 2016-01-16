@@ -148,6 +148,9 @@ typedef enum
 
 	/*seek request from service on all channels*/
 	GF_NET_SERVICE_SEEK,
+
+	/*query codec statistic on all channels*/
+	GF_NET_SERVICE_CODEC_STAT_QUERY,
 } GF_NET_CHAN_CMD;
 
 /*channel command for all commands that don't need params:
@@ -541,6 +544,7 @@ typedef struct
 	Bool is_announce, is_splicing;
 	Bool reload_external;
 	Bool enable_if_defined;
+	Bool disable_if_defined;
 	Double activation_countdown;
 } GF_AssociatedContentLocation;
 
@@ -558,6 +562,7 @@ typedef struct
 	Bool force_reload;
 	Bool is_paused;
 	Bool is_discontinuity;
+	u64 ntp;
 } GF_AssociatedContentTiming;
 
 /*GF_NET_CHAN_NALU_MODE*/
@@ -570,6 +575,17 @@ typedef struct
 	//mode 1: extract in Annex B format (start code + nalu)
 	u32 extract_mode;
 } GF_NALUExtractMode;
+
+/*GF_NET_SERVICE_CODEC_STAT_QUERY*/
+typedef struct
+{
+	/*avg_dec_time is the maximum average decoding time of all channels; 
+	  max_dec_time, irap_avg_dec_time and irap_max_dec_time is the maximum decoding time of a frame and a I frame in this channel*/
+	u32 avg_dec_time, max_dec_time, irap_avg_dec_time, irap_max_dec_time;
+	/*flag codec has been reset*/
+	Bool codec_reset;
+	Bool decode_only_rap;
+} GF_CodecStat;
 
 typedef union __netcommand
 {
@@ -600,6 +616,7 @@ typedef union __netcommand
 	GF_NALUExtractMode nalu_mode;
 	GF_NetComSendEvent send_event;
 	GF_NetQualityQuery quality_query;
+	GF_CodecStat codec_stat;
 } GF_NetworkCommand;
 
 /*
