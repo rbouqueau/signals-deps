@@ -52,7 +52,7 @@ typedef struct _gf_addon_media GF_AddonMedia;
 
 struct _net_service
 {
-	/*the module handling this service - must be declared first to typecast with GF_DownlaodSession upon deletion*/
+	/*the module handling this service - must be declared first to typecast with GF_DownloadSession upon deletion*/
 	GF_InputService *ifce;
 
 	//function table of service
@@ -163,6 +163,9 @@ struct _scene
 	*/
 	u32 graph_attached;
 
+	//indicates a valid object is attached to the scene
+	Bool object_attached;
+	
 	/*set to 1 when single time-line presentation with only static resources (ONE OD AU is detected or no media removal/adding possible)
 	This allows preventing OD/BIFS streams shutdown/startup when seeking.*/
 	Bool static_media_ressources;
@@ -206,6 +209,8 @@ struct _scene
 	GF_Clock *dyn_ck;
 	/*URLs of current video, audio and subs (we can't store objects since they may be destroyed when seeking)*/
 	SFURL visual_url, audio_url, text_url, dims_url;
+
+	Bool is_srd;
 
 	Bool end_of_scene;
 #ifndef GPAC_DISABLE_VRML
@@ -277,7 +282,7 @@ not root one. Returns 1 if handled (cf user.h, navigate event)*/
 Bool gf_scene_process_anchor(GF_Node *caller, GF_Event *evt);
 void gf_scene_force_size_to_video(GF_Scene *scene, GF_MediaObject *mo);
 
-//check clock status. 
+//check clock status.
 //If @check_buffering is 0, returns 1 if all clocks have seen eos, 0 otherwise
 //If @check_buffering is 1, returns 1 if no clock is buffering, 0 otheriwse
 Bool gf_scene_check_clocks(GF_ClientService *ns, GF_Scene *scene, Bool check_buffering);
@@ -285,6 +290,8 @@ Bool gf_scene_check_clocks(GF_ClientService *ns, GF_Scene *scene, Bool check_buf
 void gf_scene_notify_event(GF_Scene *scene, u32 event_type, GF_Node *n, void *dom_evt, GF_Err code, Bool no_queueing);
 
 void gf_scene_mpeg4_inline_restart(GF_Scene *scene);
+void gf_scene_mpeg4_inline_check_restart(GF_Scene *scene);
+
 
 GF_Node *gf_scene_get_subscene_root(GF_Node *inline_node);
 
@@ -474,7 +481,12 @@ void gf_term_stop_scheduler(GF_Terminal *term);
 void gf_term_add_codec(GF_Terminal *term, GF_Codec *codec);
 void gf_term_remove_codec(GF_Terminal *term, GF_Codec *codec);
 void gf_term_start_codec(GF_Codec *codec, Bool is_resume);
-void gf_term_stop_codec(GF_Codec *codec, Bool is_pause);
+/*stops codec, reason if
+ -0: regular stop
+ -1: pause
+ -2: stop codec because end of stream : doesn't reset composition memory
+ */
+void gf_term_stop_codec(GF_Codec *codec, u32 reason);
 void gf_term_set_threading(GF_Terminal *term, u32 mode);
 void gf_term_set_priority(GF_Terminal *term, s32 Priority);
 
@@ -1166,6 +1178,7 @@ struct _mediaobj
 	u32 width, height, stride, pixel_ar, pixelformat;
 	Bool is_flipped;
 	u32 sample_rate, num_channels, bits_per_sample, channel_config;
+	u32 srd_x, srd_y, srd_w, srd_h;
 };
 
 GF_MediaObject *gf_mo_new();

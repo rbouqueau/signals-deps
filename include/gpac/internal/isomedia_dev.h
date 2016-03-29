@@ -34,7 +34,7 @@ extern "C" {
 
 #ifndef GPAC_DISABLE_ISOM
 
-	
+
 #if defined(GPAC_DISABLE_ISOM_FRAGMENTS) && !defined(GPAC_DISABLE_ISOM_ADOBE)
 #define GPAC_DISABLE_ISOM_ADOBE
 #endif
@@ -1068,7 +1068,7 @@ typedef struct
 } GF_DIMSSampleEntryBox;
 
 
-typedef struct 
+typedef struct
 {
 	GF_ISOM_FULL_BOX
 	char *config;
@@ -1280,6 +1280,8 @@ typedef struct
 
 	GF_List *sampleGroups;
 	GF_List *sampleGroupsDescription;
+	u32 nb_sgpd_in_stbl;
+	u32 nb_other_boxes_in_stbl;
 
 	GF_List *sai_sizes;
 	GF_List *sai_offsets;
@@ -2454,6 +2456,8 @@ typedef struct {
 	u16 transfer_characteristics;
 	u16 matrix_coefficients;
 	Bool full_range_flag;
+	u8 *opaque;
+	u32 opaque_size;
 } GF_ColourInformationBox;
 
 typedef struct {
@@ -2633,7 +2637,7 @@ struct __tag_isom {
 	u8 is_jp2;
 	u8 force_co64;
 
-	Bool keep_utc;
+	Bool keep_utc, drop_date_version_info;
 	/*main boxes for fast access*/
 	/*moov*/
 	GF_MovieBox *moov;
