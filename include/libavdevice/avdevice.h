@@ -135,7 +135,7 @@ enum AVAppToDevMessageType {
     /**
      * Repaint request message.
      *
-     * Message is sent to the device when window have to be rapainted.
+     * Message is sent to the device when window has to be repainted.
      *
      * data: AVDeviceRect: area required to be repainted.
      *       NULL: whole area is required to be repainted.
@@ -154,6 +154,41 @@ enum AVAppToDevMessageType {
     AV_APP_TO_DEV_PAUSE        = MKBETAG('P', 'A', 'U', ' '),
     AV_APP_TO_DEV_PLAY         = MKBETAG('P', 'L', 'A', 'Y'),
     AV_APP_TO_DEV_TOGGLE_PAUSE = MKBETAG('P', 'A', 'U', 'T'),
+
+    /**
+     * Volume control message.
+     *
+     * Set volume level. It may be device-dependent if volume
+     * is changed per stream or system wide. Per stream volume
+     * change is expected when possible.
+     *
+     * data: double: new volume with range of 0.0 - 1.0.
+     */
+    AV_APP_TO_DEV_SET_VOLUME = MKBETAG('S', 'V', 'O', 'L'),
+
+    /**
+     * Mute control messages.
+     *
+     * Change mute state. It may be device-dependent if mute status
+     * is changed per stream or system wide. Per stream mute status
+     * change is expected when possible.
+     *
+     * data: NULL.
+     */
+    AV_APP_TO_DEV_MUTE        = MKBETAG(' ', 'M', 'U', 'T'),
+    AV_APP_TO_DEV_UNMUTE      = MKBETAG('U', 'M', 'U', 'T'),
+    AV_APP_TO_DEV_TOGGLE_MUTE = MKBETAG('T', 'M', 'U', 'T'),
+
+    /**
+     * Get volume/mute messages.
+     *
+     * Force the device to send AV_DEV_TO_APP_VOLUME_LEVEL_CHANGED or
+     * AV_DEV_TO_APP_MUTE_STATE_CHANGED command respectively.
+     *
+     * data: NULL.
+     */
+    AV_APP_TO_DEV_GET_VOLUME = MKBETAG('G', 'V', 'O', 'L'),
+    AV_APP_TO_DEV_GET_MUTE   = MKBETAG('G', 'M', 'U', 'T'),
 };
 
 /**
@@ -196,7 +231,7 @@ enum AVDevToAppMessageType {
      * Display window buffer message.
      *
      * Device requests to display a window buffer.
-     * Message is sent when new frame is ready to be displyed.
+     * Message is sent when new frame is ready to be displayed.
      * Usually buffers need to be swapped in handler of this message.
      *
      * data: NULL.
@@ -237,6 +272,24 @@ enum AVDevToAppMessageType {
      */
     AV_DEV_TO_APP_BUFFER_READABLE = MKBETAG('B','R','D',' '),
     AV_DEV_TO_APP_BUFFER_WRITABLE = MKBETAG('B','W','R',' '),
+
+    /**
+     * Mute state change message.
+     *
+     * Device informs that mute state has changed.
+     *
+     * data: int: 0 for not muted state, non-zero for muted state.
+     */
+    AV_DEV_TO_APP_MUTE_STATE_CHANGED = MKBETAG('C','M','U','T'),
+
+    /**
+     * Volume level change message.
+     *
+     * Device informs that volume level has changed.
+     *
+     * data: double: new volume with range of 0.0 - 1.0.
+     */
+    AV_DEV_TO_APP_VOLUME_LEVEL_CHANGED = MKBETAG('C','V','O','L'),
 };
 
 /**
@@ -271,10 +324,10 @@ int avdevice_dev_to_app_control_message(struct AVFormatContext *s,
  * Following API allows user to probe device capabilities (supported codecs,
  * pixel formats, sample formats, resolutions, channel counts, etc).
  * It is build on top op AVOption API.
- * Queried capabilities allows to set up converters of video or audio
+ * Queried capabilities make it possible to set up converters of video or audio
  * parameters that fit to the device.
  *
- * List of capablities that can be queried:
+ * List of capabilities that can be queried:
  *  - Capabilities valid for both audio and video devices:
  *    - codec:          supported audio/video codecs.
  *                      type: AV_OPT_TYPE_INT (AVCodecID value)
@@ -338,9 +391,9 @@ int avdevice_dev_to_app_control_message(struct AVFormatContext *s,
  */
 
 /**
- * Structure describes device capabilites.
+ * Structure describes device capabilities.
  *
- * It is used by devices in conjuntion with av_device_capabilities AVOption table
+ * It is used by devices in conjunction with av_device_capabilities AVOption table
  * to implement capabilities probing API based on AVOption API. Should not be used directly.
  */
 typedef struct AVDeviceCapabilitiesQuery {
@@ -360,7 +413,7 @@ typedef struct AVDeviceCapabilitiesQuery {
 } AVDeviceCapabilitiesQuery;
 
 /**
- * AVOption table used by devices to implement device capabilites API. Should not be used by a user.
+ * AVOption table used by devices to implement device capabilities API. Should not be used by a user.
  */
 extern const AVOption av_device_capabilities[];
 
@@ -425,10 +478,32 @@ typedef struct AVDeviceInfoList {
 int avdevice_list_devices(struct AVFormatContext *s, AVDeviceInfoList **device_list);
 
 /**
- * Convinient function to free result of avdevice_list_devices().
+ * Convenient function to free result of avdevice_list_devices().
  *
  * @param devices device list to be freed.
  */
 void avdevice_free_list_devices(AVDeviceInfoList **device_list);
+
+/**
+ * List devices.
+ *
+ * Returns available device names and their parameters.
+ * These are convinient wrappers for avdevice_list_devices().
+ * Device context is allocated and deallocated internally.
+ *
+ * @param device           device format. May be NULL if device name is set.
+ * @param device_name      device name. May be NULL if device format is set.
+ * @param device_options   An AVDictionary filled with device-private options. May be NULL.
+ *                         The same options must be passed later to avformat_write_header() for output
+ *                         devices or avformat_open_input() for input devices, or at any other place
+ *                         that affects device-private options.
+ * @param[out] device_list list of autodetected devices
+ * @return count of autodetected devices, negative on error.
+ * @note device argument takes precedence over device_name when both are set.
+ */
+int avdevice_list_input_sources(struct AVInputFormat *device, const char *device_name,
+                                AVDictionary *device_options, AVDeviceInfoList **device_list);
+int avdevice_list_output_sinks(struct AVOutputFormat *device, const char *device_name,
+                               AVDictionary *device_options, AVDeviceInfoList **device_list);
 
 #endif /* AVDEVICE_AVDEVICE_H */
