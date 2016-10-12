@@ -31,6 +31,28 @@
 extern "C" {
 #endif
 
+
+/*!
+ *	\file <gpac/terminal.h>
+ *	\brief GPAC media player API.
+ */
+	
+/*! \defgroup playback_grp Media Player
+ *	\brief GPAC media player (streaming engine and compositor).
+ *	
+*/
+	
+/*!
+ *\addtogroup terminal_grp Terminal
+ *\ingroup playback_grp
+ *\brief GPAC media player APIs.
+ *
+ *This section documents the user-level API of the GPAC media player.
+ *	@{
+ */
+	
+
+
 #include <gpac/user.h>
 
 /*creates a new terminal for a userApp callback*/
@@ -75,6 +97,9 @@ framerate
 Double gf_term_get_framerate(GF_Terminal *term, Bool absoluteFPS);
 /*get main scene current time in milliseconds*/
 u32 gf_term_get_time_in_ms(GF_Terminal *term);
+
+/*get elapsed time in milliseconds since loading of the scene - may be different from scene time when seeking or live content*/
+u32 gf_term_get_elapsed_time_in_ms(GF_Terminal *term);
 
 /*returns current URL address*/
 const char *gf_term_get_url(GF_Terminal *term);
@@ -215,6 +240,8 @@ void gf_term_switch_quality(GF_Terminal *term, Bool up);
 
 /*get global clock in milliseconds*/
 u32 gf_term_get_clock(GF_Terminal *term);
+
+/*! @} */
 
 #ifdef __cplusplus
 }

@@ -76,7 +76,9 @@ enum
 	messages during this phase in order to avoid any deadlocks*/
 	GF_SR_IN_RECONFIG = 1<<4,
 	/*special flag indicating the set size is actually due to a notif by the plugin*/
-	GF_SR_CFG_WINDOWSIZE_NOTIF = 1<<10,
+	GF_SR_CFG_WINDOWSIZE_NOTIF = 1<<5,
+	/*special flag indicating this is the initial resize, and video setup should be sent*/
+	GF_SR_CFG_INITIAL_RESIZE = 1<<6,
 };
 
 
@@ -100,6 +102,7 @@ typedef struct
 	Bool rect_texture;
 	Bool point_sprite;
 	Bool vbo, pbo;
+	Bool gles2_unpack;
 	u32 yuv_texture;
 	Bool has_shaders;
 	s32 max_texture_size;
@@ -231,7 +234,7 @@ struct __tag_compositor
 	u32 vp_x, vp_y, vp_width, vp_height;
 	/*backbuffer size - in scalable mode, matches display size, otherwise matches scene size*/
 	u32 output_width, output_height;
-
+	Bool output_as_8bit;
 	/*scene size if any*/
 	u32 scene_width, scene_height;
 	Bool has_size_info;
@@ -242,6 +245,8 @@ struct __tag_compositor
 	u32 force_next_frame_redraw;
 	/*freeze_display prevents any screen updates - needed when output driver uses direct video memory access*/
 	Bool is_hidden, freeze_display;
+
+	//debug non-immediate mode ny erasing the parts that would have been drawn
 	Bool debug_defer;
 
 	Bool disable_composite_blit, disable_hardware_blit, rebuild_offscreen_textures;
@@ -269,7 +274,7 @@ struct __tag_compositor
 #ifdef OPENGL_RASTER
 	Bool opengl_raster;
 #endif
-
+	
 	//in this mode all 2D raster is done through and RGBA canvas except background IO and textures which are done by the GPU. The canvas is then flushed to GPU.
 	//the mode supports defer and immediate rendering
 	Bool hybrid_opengl;
@@ -517,6 +522,7 @@ struct __tag_compositor
 	GF_Mesh *hybgl_mesh;
 	GF_Mesh *hybgl_mesh_background;
 
+	Bool force_type_3d;
 	char *screen_buffer;
 	u32 screen_buffer_alloc_size;
 #endif
@@ -636,12 +642,13 @@ typedef struct _gf_sc_texture_handler
 
 	/*image data for natural media*/
 	char *data;
-	u32 size, width, height, stride, pixelformat, pixel_ar;
+	u32 size, width, height, pixelformat, pixel_ar, stride, stride_chroma;
 	Bool is_flipped;
 
 	Bool raw_memory;
 	u8 *pU, *pV;
 	u32 nb_frames, upload_time;
+	GF_MediaDecoderFrame *frame;
 
 #ifndef GPAC_DISABLE_VRML
 	/*if set texture has been transformed by MatteTexture -> disable blit*/
@@ -770,6 +777,10 @@ struct _traversing_state
 	u32 traversing_mode;
 	/*for 2D drawing, indicates objects are to be drawn as soon as traversed, at each frame*/
 	Bool immediate_draw;
+	//flag set when immediate_draw whn in defer mode, so that canvas is not erased in hybgl mode
+	Bool immediate_for_defer;
+	
+	
 	/*current subtree is part of a switched-off subtree (needed for audio)*/
 	Bool switched_off;
 	/*set by the traversed subtree to indicate no cull shall be performed*/
@@ -1194,12 +1205,12 @@ void compositor_2d_release_video_access(GF_VisualManager *surf);
 void compositor_2d_init_callbacks(GF_Compositor *compositor);
 GF_Rect compositor_2d_update_clipper(GF_TraverseState *tr_state, GF_Rect this_clip, Bool *need_restore, GF_Rect *original, Bool for_layer);
 Bool compositor_2d_check_attached(GF_VisualManager *visual);
-void compositor_2d_clear_surface(GF_VisualManager *visual, GF_IRect *rc, u32 BackColor, Bool is_offscreen);
+void compositor_2d_clear_surface(GF_VisualManager *visual, GF_IRect *rc, u32 BackColor, u32 is_offscreen);
 
 #ifndef GPAC_DISABLE_3D
 void compositor_2d_reset_gl_auto(GF_Compositor *compositor);
 void compositor_2d_hybgl_flush_video(GF_Compositor *compositor, GF_IRect *area);
-void compositor_2d_hybgl_clear_surface(GF_VisualManager *visual, GF_IRect *rc, u32 BackColor, Bool is_offscreen_clear);
+void compositor_2d_hybgl_clear_surface(GF_VisualManager *visual, GF_IRect *rc, u32 BackColor, u32 is_offscreen_clear);
 #endif
 
 Bool compositor_texture_rectangles(GF_VisualManager *visual, GF_TextureHandler *txh, GF_IRect *clip, GF_Rect *unclip, GF_Window *src, GF_Window *dst, Bool *disable_blit, Bool *has_scale);
@@ -1456,6 +1467,9 @@ Bool gf_sc_is_over(GF_Compositor *compositor, GF_SceneGraph *scene_graph);
 
 /*returns true if scene or current layer accepts tghe requested navigation type, false otherwise*/
 Bool gf_sc_navigation_supported(GF_Compositor *compositor, u32 type);
+
+/*returns true if 3D acceleration is enabled*/
+Bool gf_sc_use_3d(GF_Compositor *compositor);
 
 #ifdef __cplusplus
 }

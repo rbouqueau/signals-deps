@@ -1,1 +1,1 @@
-#define GPAC_GIT_REVISION "228-g567307a-master" 
+#define GPAC_GIT_REVISION "1028-gca22280-master" 

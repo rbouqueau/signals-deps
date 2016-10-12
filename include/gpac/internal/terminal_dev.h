@@ -210,7 +210,9 @@ struct _scene
 	/*URLs of current video, audio and subs (we can't store objects since they may be destroyed when seeking)*/
 	SFURL visual_url, audio_url, text_url, dims_url;
 
-	Bool is_srd;
+	Bool is_srd, is_tiled_srd;
+	s32 srd_min_x, srd_max_x, srd_min_y, srd_max_y;
+
 
 	Bool end_of_scene;
 #ifndef GPAC_DISABLE_VRML
@@ -243,7 +245,7 @@ struct _scene
 	u32 sys_clock_at_main_activation, obj_clock_at_main_activation;
 
 	Bool pause_at_first_frame;
-	Bool is_live360;
+	u32 vr_type;
 };
 
 GF_Scene *gf_scene_new(GF_Scene *parentScene);
@@ -472,6 +474,8 @@ struct _tag_terminal
 
 	u32 nb_calls_in_event_proc;
 	u32 disconnect_request_status;
+	
+	Bool orientation_sensors_active;
 };
 
 
@@ -595,6 +599,10 @@ void gf_clock_stop(GF_Clock *ck);
 u32 gf_clock_time(GF_Clock *ck);
 /*return media time in ms*/
 u32 gf_clock_media_time(GF_Clock *ck);
+
+/*return time in ms since clock started - may be different from clock time when seeking or live*/
+u32 gf_clock_elapsed_time(GF_Clock *ck);
+
 /*sets clock time - FIXME: drift updates for OCRs*/
 void gf_clock_set_time(GF_Clock *ck, u32 TS);
 /*return clock time in ms without drift adjustment - used by audio objects only*/
@@ -715,8 +723,10 @@ struct _es_channel
 	Double ocr_scale;
 	/*clock driving this stream - currently only CTS is supported (no OCR)*/
 	struct _object_clock *clock;
-	/*flag for clock init. Only a channel owning the clock will set this flag on clock init*/
+	/*flag for clock init*/
 	Bool IsClockInit;
+	/*flag for clock init*/
+	Bool clock_inherited;
 	/*indicates that no DTS is signaled and that they should be recomputed if needed (video only)*/
 	Bool recompute_dts;
 	u32 min_ts_inc, min_computed_cts;
@@ -886,7 +896,7 @@ struct _generic_codec
 	u32 bytes_per_sec;
 	Double fps;
 	u32 nb_dispatch_skipped;
-	Bool direct_vout;
+	Bool direct_vout, direct_frame_output;
 
 	/*statistics*/
 	u32 last_stat_start, cur_bit_size, stat_start;
@@ -917,6 +927,8 @@ struct _generic_codec
 
 	/*signals that CB should be resized to this value once all units in CB has been consumed (codec config change)*/
 	u32 force_cb_resize;
+	
+	Bool hybrid_layered_coded;
 };
 
 GF_Codec *gf_codec_new(GF_ObjectManager *odm, GF_ESD *base_layer, s32 PL, GF_Err *e);
@@ -1179,6 +1191,10 @@ struct _mediaobj
 	Bool is_flipped;
 	u32 sample_rate, num_channels, bits_per_sample, channel_config;
 	u32 srd_x, srd_y, srd_w, srd_h;
+	
+	u32 quality_degradation_hint;
+	u32 view_min_x, view_max_x, view_min_y, view_max_y;
+	GF_MediaDecoderFrame *media_frame;
 };
 
 GF_MediaObject *gf_mo_new();

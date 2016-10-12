@@ -229,9 +229,10 @@ enum
 
 	GF_ISOM_BOX_TYPE_HVC2	= GF_4CC( 'h', 'v', 'c', '2' ),
 	GF_ISOM_BOX_TYPE_HEV2	= GF_4CC( 'h', 'e', 'v', '2' ),
-	GF_ISOM_BOX_TYPE_SHCC	= GF_4CC( 's', 'h', 'c', 'C' ),
-	GF_ISOM_BOX_TYPE_SHC1	= GF_4CC( 's', 'h', 'c', '1' ),
-	GF_ISOM_BOX_TYPE_SHV1	= GF_4CC( 's', 'h', 'v', '1' ),
+	GF_ISOM_BOX_TYPE_LHV1	= GF_4CC( 'l', 'h', 'v', '1' ),
+	GF_ISOM_BOX_TYPE_LHE1	= GF_4CC( 'l', 'h', 'e', '1' ),
+
+	GF_ISOM_BOX_TYPE_LHVC	= GF_4CC( 'l', 'h', 'v', 'C' ),
 
 	/*LASeR extension*/
 	GF_ISOM_BOX_TYPE_LSRC	= GF_4CC( 'l', 's', 'r', 'C' ),
@@ -427,6 +428,7 @@ enum
 
 	/*MS Smooth - these are actually UUID boxes*/
 	GF_ISOM_BOX_UUID_PSSH	= GF_4CC( 'P', 'S', 'S', 'H' ),
+	GF_ISOM_BOX_UUID_MSSM   = GF_4CC( 'M', 'S', 'S', 'M' ), /*Stream Manifest box*/
 	GF_ISOM_BOX_UUID_TENC	= GF_4CC( 'T', 'E', 'N', 'C' ),
 	GF_ISOM_BOX_UUID_TFRF	= GF_4CC( 'T', 'F', 'R', 'F' ),
 	GF_ISOM_BOX_UUID_TFXD	= GF_4CC( 'T', 'F', 'X', 'D' ),
@@ -466,7 +468,7 @@ typedef struct
 typedef struct
 {
   GF_ISOM_BOX
-  GF_TrackFragmentRandomAccessBox* tfra;
+  GF_List* tfra_list;
 } GF_MovieFragmentRandomAccessBox;
 
 typedef struct
@@ -482,6 +484,8 @@ typedef struct
 	char *data;
 	u32 dataSize;
 } GF_UnknownUUIDBox;
+
+u32 gf_isom_solve_uuid_box(char *UUID);
 
 typedef struct
 {
@@ -966,7 +970,7 @@ typedef struct
 	GF_AVCConfigurationBox *svc_config;
 	/*hevc extension*/
 	GF_HEVCConfigurationBox *hevc_config;
-	GF_HEVCConfigurationBox *shvc_config;
+	GF_HEVCConfigurationBox *lhvc_config;
 
 	/*ext descriptors*/
 	GF_MPEG4ExtensionDescriptorsBox *descr;
@@ -1340,6 +1344,7 @@ typedef struct
 	GF_ISOM_BOX
 	char *data;
 	u32 dataSize;
+	u32 original_4cc;
 } GF_FreeSpaceBox;
 
 typedef struct
@@ -1797,6 +1802,7 @@ typedef struct
 
 	struct __piff_sample_enc_box *piff_sample_encryption;
 	struct __sample_encryption_box *sample_encryption;
+	struct __traf_mss_timeext_box *tfxd; /*similar to PRFT but for Smooth Streaming*/
 
 	/*when data caching is on*/
 	u32 DataCache;
@@ -2298,6 +2304,84 @@ typedef struct
 } GF_RollRecoveryEntry;
 
 
+/*Operating Points Information - 'oinf' type*/
+typedef struct
+{
+	u16 scalability_mask;
+	GF_List* profile_tier_levels;
+	GF_List* operating_points;
+	GF_List* dependency_layers;
+} GF_OperatingPointsInformation;
+
+GF_OperatingPointsInformation *gf_isom_oinf_new_entry();
+void gf_isom_oinf_del_entry(void *entry);
+GF_Err gf_isom_oinf_read_entry(void *entry, GF_BitStream *bs);
+GF_Err gf_isom_oinf_write_entry(void *entry, GF_BitStream *bs);
+u32 gf_isom_oinf_size_entry(void *entry);
+Bool gf_isom_get_oinf_info(GF_ISOFile *file, u32 trackNumber, GF_OperatingPointsInformation **ptr);
+
+
+/*Operating Points Information - 'oinf' type*/
+typedef struct
+{
+	u8 layer_id;
+	u8 min_TemporalId;
+	u8 max_TemporalId;
+	u8 sub_layer_presence_flags;
+} LHVCLayerInfoItem;
+
+typedef struct
+{
+	GF_List* num_layers_in_track;
+} GF_LHVCLayerInformation;
+
+GF_LHVCLayerInformation *gf_isom_linf_new_entry();
+void gf_isom_linf_del_entry(void *entry);
+GF_Err gf_isom_linf_read_entry(void *entry, GF_BitStream *bs);
+GF_Err gf_isom_linf_write_entry(void *entry, GF_BitStream *bs);
+u32 gf_isom_linf_size_entry(void *entry);
+Bool gf_isom_get_linf_info(GF_ISOFile *file, u32 trackNumber, GF_LHVCLayerInformation **ptr);
+
+
+#define MAX_LHEVC_LAYERS	64
+
+typedef struct
+{
+	u8 general_profile_space, general_tier_flag, general_profile_idc, general_level_idc;
+	u32 general_profile_compatibility_flags;
+	u64 general_constraint_indicator_flags;
+} LHEVC_ProfileTierLevel;
+
+typedef struct
+{
+	u8 ptl_idx;
+	u8 layer_id;
+	Bool is_outputlayer, is_alternate_outputlayer;
+} LHEVC_LayerInfo;
+
+typedef struct
+{
+	u16 output_layer_set_idx;
+	u8 max_temporal_id;
+	u8 layer_count;
+	LHEVC_LayerInfo layers_info[MAX_LHEVC_LAYERS];
+	u16 minPicWidth, minPicHeight, maxPicWidth, maxPicHeight;
+	u8 maxChromaFormat, maxBitDepth;
+	Bool frame_rate_info_flag, bit_rate_info_flag;
+	u16 avgFrameRate;
+	u8 constantFrameRate;
+	u32 maxBitRate, avgBitRate;
+} LHEVC_OperatingPoint;
+
+
+typedef struct
+{
+	u8 dependent_layerID;
+	u8 num_layers_dependent_on;
+	u8 dependent_on_layerID[MAX_LHEVC_LAYERS];
+	u8 dimension_identifier[16];
+} LHEVC_DependentLayer;
+
 
 /*
 		CENC stuff
@@ -2306,9 +2390,12 @@ typedef struct
 /*CENCSampleEncryptionGroupEntry - 'seig' type*/
 typedef struct
 {
-	u32 IsEncrypted;
-	u8 IV_size;
+	u8 crypt_byte_block, skip_byte_block;
+	u8 IsProtected;
+	u8 Per_Sample_IV_size;
 	bin128 KID;
+	u8 constant_IV_size;
+	bin128 constant_IV;
 } GF_CENCSampleEncryptionGroupEntry;
 
 typedef struct
@@ -2326,9 +2413,12 @@ typedef struct __cenc_tenc_box
 {
 	GF_ISOM_FULL_BOX
 
-	u32 IsEncrypted;
-	u8 IV_size;
+	u8 crypt_byte_block, skip_byte_block;
+	u8 isProtected;
+	u8 Per_Sample_IV_Size;
 	bin128 KID;
+	u8 constant_IV_size;
+	bin128 constant_IV;
 } GF_TrackEncryptionBox;
 
 typedef struct __piff_tenc_box
@@ -2399,15 +2489,28 @@ typedef struct __sample_encryption_box
 
 } GF_SampleEncryptionBox;
 
+typedef struct __traf_mss_timeext_box
+{
+	GF_ISOM_UUID_BOX
+	u8 version;
+	u32 flags;
+
+	u64 absolute_time_in_track_timescale;
+	u64 fragment_duration_in_track_timescale;
+} GF_MSSTimeExtBox;
+
 GF_PIFFSampleEncryptionBox *gf_isom_create_piff_psec_box(u8 version, u32 flags, u32 AlgorithmID, u8 IV_size, bin128 KID);
 GF_SampleEncryptionBox * gf_isom_create_samp_enc_box(u8 version, u32 flags);
 
 void gf_isom_cenc_get_default_info_ex(GF_TrackBox *trak, u32 sampleDescriptionIndex, u32 *default_IsEncrypted, u8 *default_IV_size, bin128 *default_KID);
+void gf_isom_cenc_get_default_pattern_info_ex(GF_TrackBox *trak, u32 sampleDescriptionIndex, u8 *default_crypt_byte_block, u8 *default_skip_byte_block);
 #ifndef	GPAC_DISABLE_ISOM_FRAGMENTS
-GF_Err gf_isom_get_sample_cenc_info_ex(GF_TrackBox *trak, GF_TrackFragmentBox *traf, u32 sample_number, u32 *IsEncrypted, u8 *IV_size, bin128 *KID);
+GF_Err gf_isom_get_sample_cenc_info_ex(GF_TrackBox *trak, GF_TrackFragmentBox *traf, u32 sample_number, u32 *IsEncrypted, u8 *IV_size, bin128 *KID,
+										u8 *crypt_byte_block, u8 *skip_byte_block, u8 *constant_IV_size, bin128 *constant_IV);
 GF_Err senc_Parse(GF_BitStream *bs, GF_TrackBox *trak, GF_TrackFragmentBox *traf, GF_SampleEncryptionBox *ptr);
 #else
-GF_Err gf_isom_get_sample_cenc_info_ex(GF_TrackBox *trak, void *traf, u32 sample_number, u32 *IsEncrypted, u8 *IV_size, bin128 *KID);
+GF_Err gf_isom_get_sample_cenc_info_ex(GF_TrackBox *trak, void *traf, u32 sample_number, u32 *IsEncrypted, u8 *IV_size, bin128 *KID,
+										u8 *crypt_byte_block, u8 *skip_byte_block, u8 *constant_IV_size, bin128 *constant_IV);
 GF_Err senc_Parse(GF_BitStream *bs, GF_TrackBox *trak, void *traf, GF_SampleEncryptionBox *ptr);
 #endif
 
@@ -2664,6 +2767,7 @@ struct __tag_isom {
 	u8 convert_streaming_text;
 	u8 is_jp2;
 	u8 force_co64;
+	u8 is_dump_mode;
 
 	Bool keep_utc, drop_date_version_info;
 	/*main boxes for fast access*/
@@ -2853,7 +2957,7 @@ GF_Err stbl_RemoveSampleGroup(GF_SampleTableBox *stbl, u32 SampleNumber);
 
 #ifndef	GPAC_DISABLE_ISOM_FRAGMENTS
 GF_Err gf_isom_close_fragments(GF_ISOFile *movie);
-GF_Err gf_isom_copy_sample_group_entry_to_traf(GF_TrackFragmentBox *traf, GF_SampleTableBox *stbl, u32 grouping_type, u32 sampleGroupDescriptionIndex, Bool sgpd_in_traf);
+GF_Err gf_isom_copy_sample_group_entry_to_traf(GF_TrackFragmentBox *traf, GF_SampleTableBox *stbl, u32 grouping_type, u32 grouping_type_parameter, u32 sampleGroupDescriptionIndex, Bool sgpd_in_traf);
 #endif
 
 Bool gf_isom_is_identical_sgpd(void *ptr1, void *ptr2, u32 grouping_type);
@@ -2907,7 +3011,7 @@ void gf_isom_cenc_set_saiz_saio(GF_SampleEncryptionBox *senc, GF_SampleTableBox 
 #endif
 void gf_isom_cenc_merge_saiz_saio(GF_SampleEncryptionBox *senc, GF_SampleTableBox *stbl, u64 offset, u32 len);
 
-void gf_isom_parse_trif_info(const char *data, u32 size, u32 *id, u32 *independent, Bool *full_frame, u32 *x, u32 *y, u32 *w, u32 *h);
+void gf_isom_parse_trif_info(const char *data, u32 size, u32 *id, u32 *independent, Bool *full_picture, u32 *x, u32 *y, u32 *w, u32 *h);
 
 #ifndef GPAC_DISABLE_ISOM_HINTING
 
@@ -3201,6 +3305,8 @@ void minf_del(GF_Box *);
 void tkhd_del(GF_Box *);
 void tref_del(GF_Box *);
 void mdia_del(GF_Box *);
+void mfra_del(GF_Box *);
+void tfra_del(GF_Box *);
 void defa_del(GF_Box *);
 void uuid_del(GF_Box *);
 void void_del(GF_Box *);
@@ -3581,9 +3687,15 @@ GF_Err styp_Size(GF_Box *s);
 
 GF_Box *mehd_New();
 void mehd_del(GF_Box *s);
-GF_Err mehd_Read(GF_Box *s, GF_BitStream *bs);
 GF_Err mehd_Write(GF_Box *s, GF_BitStream *bs);
 GF_Err mehd_Size(GF_Box *s);
+
+/*smooth streaming timing*/
+GF_Box *tfxd_New();
+void tfxd_del(GF_Box *s);
+GF_Err tfxd_Read(GF_Box *s, GF_BitStream *bs);
+GF_Err tfxd_Write(GF_Box *s, GF_BitStream *bs);
+GF_Err tfxd_Size(GF_Box *s);
 
 #endif
 
@@ -3965,6 +4077,9 @@ GF_Err traf_dump(GF_Box *a, FILE * trace);
 GF_Err tfhd_dump(GF_Box *a, FILE * trace);
 GF_Err trun_dump(GF_Box *a, FILE * trace);
 GF_Err styp_dump(GF_Box *a, FILE * trace);
+
+//Smooth Streaming specific
+GF_Err tfxd_dump(GF_Box *a, FILE * trace);
 #endif
 
 GF_Err avcc_dump(GF_Box *a, FILE * trace);
