@@ -259,10 +259,14 @@ this gets the maximum value (further in the past) of all representations playing
 Double gf_dash_get_timeshift_buffer_pos(GF_DashClient *dash);
 
 /*sets codec statistics for playback rate adjustment*/
-void gf_dash_set_codec_stat(GF_DashClient *dash, u32 idx, u32 avg_dec_time, u32 max_dec_time, u32 irap_avg_dec_time, u32 irap_max_dec_time, Bool codec_reset, Bool decode_only_rap);
+void gf_dash_group_set_codec_stat(GF_DashClient *dash, u32 idx, u32 avg_dec_time, u32 max_dec_time, u32 irap_avg_dec_time, u32 irap_max_dec_time, Bool codec_reset, Bool decode_only_rap);
 
 /*sets buffer levels*/
-void gf_dash_set_buffer_levels(GF_DashClient *dash, u32 idx, u32 buffer_min_ms, u32 buffer_max_ms, u32 buffer_occupancy_ms);
+void gf_dash_group_set_buffer_levels(GF_DashClient *dash, u32 idx, u32 buffer_min_ms, u32 buffer_max_ms, u32 buffer_occupancy_ms);
+
+/*indicates the buffer time in ms after which the player resumes playback. This value is less or equal to the buffer_max_ms 
+indicated in gf_dash_group_set_buffer_levels */
+GF_Err gf_dash_group_set_max_buffer_playout(GF_DashClient *dash, u32 idx, u32 max_target_buffer_ms);
 
 typedef enum
 {
@@ -491,6 +495,13 @@ GF_Err gf_dash_group_set_visible_rect(GF_DashClient *dash, u32 idx, u32 min_x, u
 /*Enables or disables threaded downloads of media files for the dash client
  @use_threads: if true, threads are used to download files*/
 void gf_dash_set_threaded_download(GF_DashClient *dash, Bool use_threads);
+
+typedef enum {
+	GF_DASH_ALGO_NONE = 0,
+	GF_DASH_ALGO_GPAC_LEGACY_RATE = 1,
+	GF_DASH_ALGO_GPAC_LEGACY_BUFFER = 2,
+} GF_DASHAdaptationAlgorithm;
+void gf_dash_set_algo(GF_DashClient *dash, GF_DASHAdaptationAlgorithm algo);
 
 #endif //GPAC_DISABLE_DASH_CLIENT
 

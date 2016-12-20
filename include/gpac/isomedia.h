@@ -303,7 +303,10 @@ enum
 	/* file complying to ISO/IEC 21000-9:2005 (MPEG-21 spec)*/
 	GF_ISOM_BRAND_MP21 = GF_4CC('m', 'p', '2', '1'),
 	/*file complying to the generic ISO Media File (base specification ISO/IEC 14496-12) + support for version 1*/
-	GF_ISOM_BRAND_ISO4 =  GF_4CC( 'i', 's', 'o', '4' )
+	GF_ISOM_BRAND_ISO4 =  GF_4CC( 'i', 's', 'o', '4' ),
+	/* Image File Format */
+	GF_ISOM_BRAND_MIF1 = GF_4CC('m', 'i', 'f', '1'),
+	GF_ISOM_BRAND_HEIC = GF_4CC('h', 'e', 'i', 'c'),
 };
 
 
@@ -668,6 +671,10 @@ returns 2 if the track uses signed compositionTime offsets (B-frames or similar)
 returns 0 if the track does not use compositionTime offsets (CTS == DTS)
 */
 u32 gf_isom_has_time_offset(GF_ISOFile *the_file, u32 trackNumber);
+
+/*returns the shift from composition time to decode time for that track if indicated, or 0 if not found
+adding shift to CTS guarantees that the shifted CTS is always greater than the DTS for any sample*/
+s64 gf_isom_get_cts_to_dts_shift(GF_ISOFile *the_file, u32 trackNumber);
 
 /*returns 1 if the track has sync shadow samples*/
 Bool gf_isom_has_sync_shadows(GF_ISOFile *the_file, u32 trackNumber);
@@ -1451,7 +1458,7 @@ GF_Err gf_isom_set_sync_shadow(GF_ISOFile *the_file, u32 trackNumber, u32 sample
 /*set the GroupID of a track (only used for optimized interleaving). By setting GroupIDs
 you can specify the storage order for media data of a group of streams. This is useful
 for BIFS presentation so that static resources of the scene can be downloaded before BIFS*/
-GF_Err gf_isom_set_track_group(GF_ISOFile *the_file, u32 trackNumber, u32 GroupID);
+GF_Err gf_isom_set_track_interleaving_group(GF_ISOFile *the_file, u32 trackNumber, u32 GroupID);
 
 /*set the priority of a track within a Group (used for optimized interleaving and hinting).
 This allows tracks to be stored before other within a same group, for instance the
@@ -1776,9 +1783,11 @@ enum
 	/*above mode is applied and PPS/SPS/... are appended in the front of every IDR*/
 	GF_ISOM_NALU_EXTRACT_INBAND_PS_FLAG = 1<<16,
 	/*above mode is applied and all start codes are rewritten (xPS inband as well)*/
-	GF_ISOM_NALU_EXTRACT_ANNEXB_FLAG = 2<<16,
+	GF_ISOM_NALU_EXTRACT_ANNEXB_FLAG = 2<<17,
 	/*above mode is applied and VDRD NAL unit is inserted before SVC slice*/
 	GF_ISOM_NALU_EXTRACT_VDRD_FLAG = 1<<18,
+	/*all extractors are skipped and only tile track data is kept*/
+	GF_ISOM_NALU_EXTRACT_TILE_ONLY = 1<<19
 };
 
 GF_Err gf_isom_set_nalu_extract_mode(GF_ISOFile *the_file, u32 trackNumber, u32 nalu_extract_mode);
@@ -2223,32 +2232,41 @@ GF_Err gf_isom_set_meta_xml(GF_ISOFile *file, Bool root_meta, u32 track_num, cha
 /*set meta XML data from memory - erase any previously (Binary)XML info*/
 GF_Err gf_isom_set_meta_xml_memory(GF_ISOFile *file, Bool root_meta, u32 track_num, unsigned char *data, u32 data_size, Bool IsBinaryXML);
 
-/*adds item to meta:
-	@self_reference: indicates this item is the file itself
-	@resource_path: file to add - can be NULL when URL/URN is used
-	@item_name: item name - if NULL, use file name. CANNOT BE NULL if resource_path is not set
-	@item_id: item id - if 0, use the last item id + 1.
-	@mime_type: item mime type - if NULL, use "application/octet-stream"
-	@content_encoding: content encoding type - if NULL, none specified
-	@URL, @URN: if set, resource will be remote (same as stream descriptions)
-*/
+typedef enum {
+	TILE_ITEM_NONE = 0,
+	TILE_ITEM_ALL_NO_BASE,
+	TILE_ITEM_ALL_BASE,
+	TILE_ITEM_ALL_GRID,
+	TILE_ITEM_SINGLE
+} GF_TileItemMode;
+
 typedef struct
 {
 	u32 width, height;
 	u32 hSpacing, vSpacing;
 	u32 hOffset, vOffset;
 	u32 angle;
+	Bool hidden;
+	void *config;
+	GF_TileItemMode tile_mode; 
+	u32 single_tile_number;
 } GF_ImageItemProperties;
 
-GF_Err gf_isom_add_meta_item(GF_ISOFile *file, Bool root_meta, u32 track_num, Bool self_reference, char *resource_path, const char *item_name, u32 item_id, const char *mime_type, const char *content_encoding, const char *URL, const char *URN, GF_ImageItemProperties *imgprop);
+GF_Err gf_isom_meta_get_next_item_id(GF_ISOFile *file, Bool root_meta, u32 track_num, u32 *item_id);
+
+GF_Err gf_isom_add_meta_item(GF_ISOFile *file, Bool root_meta, u32 track_num, Bool self_reference, char *resource_path, const char *item_name, u32 item_id, u32 item_type, const char *mime_type, const char *content_encoding, const char *URL, const char *URN, GF_ImageItemProperties *imgprop);
 /*same as above excepts take the item directly in memory*/
-GF_Err gf_isom_add_meta_item_memory(GF_ISOFile *file, Bool root_meta, u32 track_num, const char *item_name, u32 item_id, const char *mime_type, const char *content_encoding, char *data, u32 data_len);
+GF_Err gf_isom_add_meta_item_memory(GF_ISOFile *file, Bool root_meta, u32 track_num, const char *item_name, u32 item_id, u32 item_type, const char *mime_type, const char *content_encoding, GF_ImageItemProperties *image_props, char *data, u32 data_len, GF_List *item_extent_refs);
+
+GF_Err gf_isom_iff_create_image_item_from_track(GF_ISOFile *movie, Bool root_meta, u32 meta_track_number, u32 track, const char *item_name, u32 item_id, GF_ImageItemProperties *image_props, GF_List *item_extent_refs);
 
 /*removes item from meta*/
 GF_Err gf_isom_remove_meta_item(GF_ISOFile *file, Bool root_meta, u32 track_num, u32 item_num);
 
 /*sets the given item as the primary one. You SHALL NOT use this if the meta has a valid XML data*/
 GF_Err gf_isom_set_meta_primary_item(GF_ISOFile *file, Bool root_meta, u32 track_num, u32 item_num);
+
+GF_Err gf_isom_meta_add_item_ref(GF_ISOFile *file, Bool root_meta, u32 trackID, u32 from_id, u32 to_id, u32 type, u64 *ref_index);
 
 #endif /*GPAC_DISABLE_ISOM_WRITE*/
 
@@ -2402,17 +2420,17 @@ GF_Err gf_isom_ac3_config_new(GF_ISOFile *the_file, u32 trackNumber, GF_AC3Confi
 
 
 
-/*returns the number of subsamples in the given sample */
-u32 gf_isom_sample_has_subsamples(GF_ISOFile *movie, u32 track, u32 sampleNumber);
-GF_Err gf_isom_sample_get_subsample(GF_ISOFile *movie, u32 track, u32 sampleNumber, u32 subSampleNumber, u32 *size, u8 *priority, u32 *reserved, Bool *discardable);
+/*returns the number of subsamples in the given sample for the given flags*/
+u32 gf_isom_sample_has_subsamples(GF_ISOFile *movie, u32 track, u32 sampleNumber, u32 flags);
+GF_Err gf_isom_sample_get_subsample(GF_ISOFile *movie, u32 track, u32 sampleNumber, u32 flags, u32 subSampleNumber, u32 *size, u8 *priority, u32 *reserved, Bool *discardable);
 #ifndef GPAC_DISABLE_ISOM_WRITE
 /*adds subsample information to a given sample. Subsample information shall be added in increasing order of sampleNumbers, insertion of information is not supported.
 Note that you may add subsample information for samples not yet added to the file
 specifying 0 as subSampleSize will remove the last subsample information if any*/
-GF_Err gf_isom_add_subsample(GF_ISOFile *movie, u32 track, u32 sampleNumber, u32 subSampleSize, u8 priority, u32 reserved, Bool discardable);
+GF_Err gf_isom_add_subsample(GF_ISOFile *movie, u32 track, u32 sampleNumber, u32 flags, u32 subSampleSize, u8 priority, u32 reserved, Bool discardable);
 #endif
 /*add subsample information for the latest sample added to the current track fragment*/
-GF_Err gf_isom_fragment_add_subsample(GF_ISOFile *movie, u32 TrackID, u32 subSampleSize, u8 priority, u32 reserved, Bool discardable);
+GF_Err gf_isom_fragment_add_subsample(GF_ISOFile *movie, u32 TrackID, u32 flags, u32 subSampleSize, u8 priority, u32 reserved, Bool discardable);
 
 /*copy over the subsample and sampleToGroup information of the given sample from the source track/file to the last sample added to the current track fragment of the destination file*/
 GF_Err gf_isom_fragment_copy_subsample(GF_ISOFile *dest, u32 TrackID, GF_ISOFile *orig, u32 track, u32 sampleNumber, Bool sgpd_in_traf);
@@ -2460,6 +2478,10 @@ GF_Err gf_isom_remove_sample_group(GF_ISOFile *movie, u32 track, u32 grouping_ty
 
 //tags the sample in the grouping adds the given blob as a sample group description of the given grouping type. If default is set, the sample grouping will be marked as default
 GF_Err gf_isom_add_sample_info(GF_ISOFile *movie, u32 track, u32 sample_number, u32 grouping_type, u32 sampleGroupDescriptionIndex, u32 grouping_type_parameter);
+
+
+//sets track in group of type group_type and id track_group_id. If do_add is GF_FALSE, track is removed from that group
+GF_Err gf_isom_set_track_group(GF_ISOFile *file, u32 track_number, u32 track_group_id, u32 group_type, Bool do_add);
 
 #endif
 

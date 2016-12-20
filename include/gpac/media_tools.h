@@ -190,6 +190,8 @@ enum
 	GF_IMPORT_MPE_DEMUX = 1<<24,
 	/*! when set HEVC VPS is rewritten to remove VPS extensions*/
 	GF_IMPORT_NO_VPS_EXTENSIONS = 1<<25,
+	/*! when set no SEI messages are imported*/
+	GF_IMPORT_NO_SEI = 1<<26,
 
 	/*! when set by user during import, will abort*/
 	GF_IMPORT_DO_ABORT = 1<<31
@@ -442,11 +444,12 @@ GF_Err gf_media_merge_svc(GF_ISOFile *file, u32 track, Bool mergeAll);
  Split L-HEVC layers
  \param file the target movie
  \param track the target track
+ \param for_temporal_sublayers if set only temporal sublayers are split, otherwise layers are split
  \param splitAll if set each layers will be in a single track, otherwise all non-base layers will be in the same track
  \param use_extractors if set, extractors are used in the enhancement layers.
  \return error if any
  */
-GF_Err gf_media_split_lhvc(GF_ISOFile *file, u32 track, Bool splitAll, Bool use_extractors);
+GF_Err gf_media_split_lhvc(GF_ISOFile *file, u32 track, Bool for_temporal_sublayers, Bool splitAll, Bool use_extractors);
 
 /* !
  Split HEVC tiles into different tracks
@@ -844,10 +847,18 @@ GF_Err gf_dasher_process(GF_DASHSegmenter *dasher, Double sub_duration);
 /*! 
  Returns time to wait until end of currently generated segments
  *	\param dasher the DASH segmenter object
+ *  \param ms_ins_session if set, retrives the number of ms since the start of the dash session
  *	\return time to wait in milliseconds
 */
-u32 gf_dasher_next_update_time(GF_DASHSegmenter *dasher);
+u32 gf_dasher_next_update_time(GF_DASHSegmenter *dasher, u64 *ms_ins_session);
 
+
+/*! 
+ Sets dasher start date, rather than use current time. Used for debugging purposes, such as simulating long lasting sessions.
+ *	\param dasher the DASH segmenter object
+ *  \param dash_utc_start_date start date as UTC timstamp. If 0, current time is used
+*/
+void gf_dasher_set_start_date(GF_DASHSegmenter *dasher, u64 dash_utc_start_date);
 
 #ifndef GPAC_DISABLE_ISOM_FRAGMENTS
 /*!
@@ -987,7 +998,7 @@ typedef struct __tag_isom_hinter GF_RTPHinter;
  *	\param hint_flags RTP flags as defined in <gpac/ietf.h>
  *	\param PayloadID RTP payload ID, can be set to 0 for auto compute
  *	\param copy_media if set, media is copied inside the hint samples, otherwise only referenced from the media track
- *	\param InterleaveGroupID sets the group ID of this track for interleaving - same semantics as in gf_isom_set_track_group
+ *	\param InterleaveGroupID sets the group ID of this track for interleaving - same semantics as in gf_isom_set_track_interleaving_group
  *	\param InterleaveGroupPriority sets the group priority of this track for interleaving - same semantics as in gf_isom_set_track_priority_in_group
  *	\param e output error code if any
  *	\return the hinter object

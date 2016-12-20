@@ -111,6 +111,9 @@ const char *gf_4cc_to_str(u32 type);
 */
 int gf_asprintf(char **buffer, const char *fmt, ...);
 
+
+size_t gf_fread(void *ptr, size_t size, size_t nmemb, FILE *stream);
+
 /*!
  *	\brief file writing helper
  *
@@ -607,6 +610,15 @@ FILE *gf_temp_file_new(char ** const fileName);
  *	\return modification time of the file
  */
 u64 gf_file_modification_time(const char *filename);
+
+/*!
+ *	\brief File existence check
+ *
+ *	Moves or renames a file or directory.
+ *	\param fileName absolute path of the file / directory to move or rename
+ *	\return GF_TRUE if file exists
+ */
+Bool gf_file_exists(const char *fileName);
 
 /*!
  *	\brief Progress formatting

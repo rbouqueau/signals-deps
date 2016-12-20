@@ -152,6 +152,10 @@ u32 gf_mo_get_last_frame_time(GF_MediaObject *mo);
 
 Bool gf_mo_get_visual_info(GF_MediaObject *mo, u32 *width, u32 *height, u32 *stride, u32 *pixel_ar, u32 *pixelFormat, Bool *is_flipped);
 
+void gf_mo_get_nb_views(GF_MediaObject *mo, int * nb_views);
+
+void gf_mo_get_nb_layers(GF_MediaObject *mo, int * nb_layers);
+
 Bool gf_mo_get_audio_info(GF_MediaObject *mo, u32 *sample_rate, u32 *bits_per_sample, u32 *num_channels, u32 *channel_config);
 
 Fixed gf_mo_get_current_speed(GF_MediaObject *mo);
@@ -186,7 +190,6 @@ GF_MediaObject *gf_mo_load_xlink_resource(GF_Node *node, Bool primary_resource, 
 void gf_mo_unload_xlink_resource(GF_Node *node, GF_MediaObject *mo);
 /*returns scene graph associated with a scene/document object, or NULL if wrong type or not loaded*/
 GF_SceneGraph *gf_mo_get_scenegraph(GF_MediaObject *mo);
-
 
 
 typedef struct

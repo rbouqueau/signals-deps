@@ -106,6 +106,16 @@ typedef struct
 	/*to be eventually completed by other vui members*/
 } AVC_VUI;
 
+typedef struct 
+{
+	u32 left;
+	u32 right;
+	u32 top;
+	u32 bottom;
+	
+} AVC_CROP;
+
+
 typedef struct
 {
 	s32 profile_idc;
@@ -126,6 +136,7 @@ typedef struct
 	u32 width, height;
 
 	AVC_VUI vui;
+	AVC_CROP crop;
 
 	/*used to discard repeated SPSs - 0: not parsed, 1 parsed, 2 sent*/
 	u32 state;
@@ -350,6 +361,7 @@ typedef struct
 	/*used to discard repeated SPSs - 0: not parsed, 1 parsed, 2 stored*/
 	u32 state;
 	u32 crc;
+	Bool vps_extension_found;
 	u32 max_layers, max_sub_layers, max_layer_id, num_layer_sets;
 	Bool temporal_id_nesting;
 	HEVC_ProfileTierLevel ptl;

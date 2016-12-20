@@ -579,6 +579,8 @@ struct _object_clock
 	Bool has_media_time_shift;
 
 	u16 ocr_on_esid;
+
+	u64 ts_shift;
 };
 
 /*destroys clock*/
@@ -667,8 +669,8 @@ struct _es_channel
 	char *pull_reaggregated_buffer;
 	/*channel buffer flag*/
 	Bool BufferOn;
-	/*min level to trigger buffering on, max to trigger it off. */
-	u32 MinBuffer, MaxBuffer;
+	/*min level to trigger buffering on, max to trigger it off for playback resume, and max amount of prefetch buffer*/
+	u32 MinBuffer, MaxBuffer, MaxBufferOccupancy;
 	/*amount of buffered media - this is the DTS of the last received AU minus the onject clock time, to make sure
 	we always have MaxBuffer ms ready for composition when resuming the clock*/
 	s32 BufferTime;
@@ -766,6 +768,7 @@ struct _es_channel
 
 	Bool pull_forced_buffer;
 
+	u64 ts_shift;
 };
 
 /*creates a new channel for this stream*/
@@ -1193,6 +1196,8 @@ struct _mediaobj
 	u32 srd_x, srd_y, srd_w, srd_h;
 	
 	u32 quality_degradation_hint;
+	u32 nb_views;
+	u32 nb_layers;
 	u32 view_min_x, view_max_x, view_min_y, view_max_y;
 	GF_MediaDecoderFrame *media_frame;
 };
