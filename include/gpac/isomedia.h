@@ -113,40 +113,18 @@ enum
 	GF_ISOM_REF_OCR				= GF_4CC( 's', 'y', 'n', 'c' ),
 	/*ref type for IPI (Intellectual Property Information) dependencies*/
 	GF_ISOM_REF_IPI				= GF_4CC( 'i', 'p', 'i', 'r' ),
-	/*this track describes the referenced tr*/
+	/*ref type for timed Meta Data tracks*/
 	GF_ISOM_REF_META		= GF_4CC( 'c', 'd', 's', 'c' ),
 	/*ref type for Hint tracks*/
 	GF_ISOM_REF_HINT		= GF_4CC( 'h', 'i', 'n', 't' ),
 	/*ref type for QT Chapter tracks*/
 	GF_ISOM_REF_CHAP		= GF_4CC( 'c', 'h', 'a', 'p' ),
-	/*ref type for the SVC and SHVC tracks*/
+	/*ref type for the SVC tracks*/
 	GF_ISOM_REF_BASE = GF_4CC( 's', 'b', 'a', 's' ),
 	GF_ISOM_REF_SCAL = GF_4CC( 's', 'c', 'a', 'l' ),
 	GF_ISOM_REF_TBAS = GF_4CC( 't', 'b', 'a', 's' ),
 	GF_ISOM_REF_SABT = GF_4CC( 's', 'a', 'b', 't' ),
-	GF_ISOM_REF_OREF = GF_4CC( 'o', 'r', 'e', 'f' ),
-	//this track uses fonts carried/defined in the referenced track
-	GF_ISOM_REF_FONT = GF_4CC( 'f', 'o', 'n', 't' ),
-	//this track depends on the referenced hint track, i.e., it should only be used if the referenced hint track is used.
-	GF_ISOM_REF_HIND = GF_4CC( 'h', 'i', 'n', 'd' ),
-	//this track contains auxiliary depth video information for the referenced video track
-	GF_ISOM_REF_VDEP = GF_4CC( 'v', 'd', 'e', 'p' ),
-	//this track contains auxiliary parallax video information for the referenced video track
-	GF_ISOM_REF_VPLX = GF_4CC( 'v', 'p', 'l', 'x' ),
-	//this track contains subtitle, timed text or overlay graphical information for the referenced track or any track in the alternate group to which the track belongs, if any
-	GF_ISOM_REF_SUBT = GF_4CC( 's', 'u', 'b', 't' ),
-
-};
-
-//defined sample groups in GPAC
-enum {
-	GF_ISOM_SAMPLE_GROUP_ROLL = GF_4CC( 'r', 'o', 'l', 'l'),
-	GF_ISOM_SAMPLE_GROUP_RAP = GF_4CC( 'r', 'a', 'p', ' ' ),
-	GF_ISOM_SAMPLE_GROUP_SEIG = GF_4CC( 's', 'e', 'i', 'g' ),
-	GF_ISOM_SAMPLE_GROUP_OINF = GF_4CC( 'o', 'i', 'n', 'f'),
-	GF_ISOM_SAMPLE_GROUP_LINF = GF_4CC( 'l', 'i', 'n', 'f'),
-	GF_ISOM_SAMPLE_GROUP_TRIF = GF_4CC( 't', 'r', 'i', 'f' ),
-	GF_ISOM_SAMPLE_GROUP_NALM = GF_4CC( 'n', 'a', 'l', 'm'),
+	GF_ISOM_REF_OREF = GF_4CC( 'o', 'r', 'e', 'f' )
 };
 
 /*Track Edition flag*/
@@ -539,7 +517,7 @@ u32 gf_isom_get_media_type(GF_ISOFile *the_file, u32 trackNumber);
 /*return the media type FOUR CHAR code type of the media*/
 u32 gf_isom_get_media_subtype(GF_ISOFile *the_file, u32 trackNumber, u32 DescriptionIndex);
 
-/*return the media type FOUR CHAR code type of an MPEG4 media (eg, mp4a, mp4v, enca, encv, resv, etc...)
+/*return the media type FOUR CHAR code type of an MPEG4 media (eg, mp4a, mp4v, enca, encv, etc...)
 returns 0 if not MPEG-4 subtype*/
 u32 gf_isom_get_mpeg4_subtype(GF_ISOFile *the_file, u32 trackNumber, u32 DescriptionIndex);
 
@@ -1159,8 +1137,6 @@ GF_Err gf_isom_set_track_matrix(GF_ISOFile *the_file, u32 trackNumber, u32 matri
 
 GF_Err gf_isom_set_pixel_aspect_ratio(GF_ISOFile *the_file, u32 trackNumber, u32 StreamDescriptionIndex, u32 hSpacing, u32 vSpacing);
 
-GF_Err gf_isom_set_clean_apperture(GF_ISOFile *movie, u32 trackNumber, u32 StreamDescriptionIndex, u32 cleanApertureWidthN, u32 cleanApertureWidthD, u32 cleanApertureHeightN, u32 cleanApertureHeightD, u32 horizOffN, u32 horizOffD, u32 vertOffN, u32 vertOffD);
-
 /*set SR & nbChans for audio description*/
 GF_Err gf_isom_set_audio_info(GF_ISOFile *the_file, u32 trackNumber, u32 StreamDescriptionIndex, u32 sampleRate, u32 nbChannels, u8 bitsPerSample);
 
@@ -1674,12 +1650,6 @@ GF_Err gf_isom_sdp_clean(GF_ISOFile *the_file);
 
 /*dumps file structures into XML trace file */
 GF_Err gf_isom_dump(GF_ISOFile *file, FILE *trace);
-/*gets number of implemented boxes in GPAC. There can be several times the same type returned due to variation of the box (versions or flags)*/
-u32 gf_isom_get_num_supported_boxes();
-/*gets 4cc of box given its index. Index 0 is GPAC internal unknown box handler.*/
-u32 gf_isom_get_supported_box_type(u32 idx);
-/*prints default box syntax of box given its index. Index 0 is GPAC internal unknown box handler*/
-GF_Err gf_isom_dump_supported_box(u32 idx, FILE * trace);
 
 #endif /*GPAC_DISABLE_ISOM_DUMP*/
 
