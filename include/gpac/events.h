@@ -311,7 +311,7 @@ typedef struct
 {
 	/*GF_EVENT_SENSOR_ORIENTATION*/
 	u8 type;
-	/*device orientation as quaternion*/
+	/*device orientation as quaternion if w is not 0, or as radians otherwise*/
 	Float x, y, z, w;
 } GF_EventSensor;
 
@@ -325,6 +325,15 @@ typedef struct
 	u32 sensor_type;
 	Bool activate;
 } GF_EventSensorRequest;
+
+
+/*event proc return value: ignored*/
+typedef struct
+{
+	/*GF_EVENT_SENSOR_REQUEST*/
+	u8 type;
+	u32 sync_loss_ms;
+} GF_EventSyncLoss;
 
 typedef union
 {
@@ -351,6 +360,7 @@ typedef union
 	GF_EventAddonConnect addon_connect;
 	GF_EventFromService from_service;
 	GF_EventSensorRequest activate_sensor;
+	GF_EventSyncLoss sync_loss;
 } GF_Event;
 
 /*! @} */
