@@ -213,6 +213,8 @@ struct _scene
 	Bool is_tiled_srd;
 	u32 srd_type;
 	s32 srd_min_x, srd_max_x, srd_min_y, srd_max_y;
+	//ambisonic type of the scene
+	u32 ambisonic_type;
 
 
 	Bool end_of_scene;
@@ -941,6 +943,7 @@ struct _generic_codec
 	u32 force_cb_resize;
 	u32 profile_level;
 	Bool hybrid_layered_coded;
+	Bool in_splice, coding_config_changed;
 };
 
 GF_Codec *gf_codec_new(GF_ObjectManager *odm, GF_ESD *base_layer, s32 PL, GF_Err *e);
@@ -1101,6 +1104,9 @@ struct _od_manager
 	struct _od_manager *upper_layer_odm;
 	//for a scalable ODM, this indicates the lower layer odm associated
 	struct _od_manager *lower_layer_odm;
+
+	//indicates channel order (1->N) if the object is a ambisonic channel
+	u32 ambi_ch_id;
 };
 
 GF_ObjectManager *gf_odm_new();
@@ -1306,7 +1312,11 @@ struct _gf_addon_media
 	u32 addon_type;
 
 	Double splice_start, splice_end;
-	Bool is_over, coding_config_changed;
+	u32 is_over;
+	Bool splice_in_pts;
+	u32 nb_splicing;
+	Bool min_dts_set;
+	u64 splice_min_dts;
 };
 
 void gf_scene_toggle_addons(GF_Scene *scene, Bool show_addons);
