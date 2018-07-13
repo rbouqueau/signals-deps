@@ -47,6 +47,11 @@ extern "C" {
 
 #include <gpac/isomedia.h>
 
+#ifndef GPAC_DISABLE_AV_PARSERS
+//FIXME - we should move AVC and HEVC parsing to gpac/avparse.h
+#include <gpac/internal/media_dev.h>
+#endif
+
 /*loads key and salt from a LOCAL gpac-DRM file (cf MP4Box doc)*/
 GF_Err gf_ismacryp_gpac_get_info(u32 stream_id, char *drm_file, char *key, char *salt);
 
@@ -57,17 +62,17 @@ Bool gf_ismacryp_mpeg4ip_get_info(char *kms_uri, char *key, char *salt);
 enum
 {
 	/*ISMA E&A encryption*/
-	GF_CRYPT_ISMA_CRYPT_TYPE	= GF_4CC( 'i', 'A', 'E', 'C' ),
+	GF_CRYPT_TYPE_ISMA		= GF_4CC( 'i', 'A', 'E', 'C' ),
 	/*CENC CTR-128 encryption*/
-	GF_CRYPT_CENC_CRYPT_TYPE	= GF_4CC('c','e','n','c'),
+	GF_CRYPT_TYPE_CENC	= GF_4CC('c','e','n','c'),
 	/*CENC CBC-128 encryption*/
-	GF_CRYPT_CBC1_CRYPT_TYPE	= GF_4CC('c','b','c','1'),
-	/*Adobe CBC-128 encryption*/
-	GF_CRYPT_ADOBE_CRYPT_TYPE	= GF_4CC('a','d','k','m'),
+	GF_CRYPT_TYPE_CBC1	= GF_4CC('c','b','c','1'),
 	/*CENC CTR-128 pattern encryption*/
-	GF_CRYPT_CENS_CRYPT_TYPE	= GF_4CC('c','e','n','s'),
+	GF_CRYPT_TYPE_CENS	= GF_4CC('c','e','n','s'),
 	/*CENC CBC-128 pattern encryption*/
-	GF_CRYPT_CBCS_CRYPT_TYPE	= GF_4CC('c','b','c','s'),
+	GF_CRYPT_TYPE_CBCS	= GF_4CC('c','b','c','s'),
+	/*Adobe CBC-128 encryption*/
+	GF_CRYPT_TYPE_ADOBE	= GF_4CC('a','d','k','m'),
 };
 
 enum
@@ -131,15 +136,33 @@ typedef struct
 	unsigned char first_IV[16];
 	u32 defaultKeyIdx;
 	u32 keyRoll;
+	u32 clear_bytes;
 	u8 crypt_byte_block, skip_byte_block;
 	u8 constant_IV_size;
 	unsigned char constant_IV[16];
 	//true if using AES-CTR mode, false if using AES-CBC mode
 	Bool ctr_mode;
-	u32 cenc_scheme_type;
+	u32 scheme_type;
+	//for avc1 ctr CENC edition 1
+	Bool allow_encrypted_slice_header;
+	//force cenc and cbc1: 0: default, 1: no block alignment of encrypted data, 2: always block align even if producing non encrypted samples
+	u32 block_align;
+
 
 	char metadata[5000];
 	u32 metadata_len;
+
+#ifndef GPAC_DISABLE_AV_PARSERS
+	AVCState avc;
+#ifndef GPAC_DISABLE_HEVC
+	HEVCState hevc;
+#endif
+#ifndef GPAC_DISABLE_AV1
+	AV1State av1;
+#endif
+	Bool slice_header_clear;
+	Bool is_avc;
+#endif
 
 } GF_TrackCryptInfo;
 

@@ -182,6 +182,9 @@ enum
 
 	GF_ISOM_BOX_TYPE_LHVC	= GF_4CC( 'l', 'h', 'v', 'C' ),
 
+	GF_ISOM_BOX_TYPE_AV1C = GF_4CC('a', 'v', '1', 'C'),
+	GF_ISOM_BOX_TYPE_AV01 = GF_4CC('a', 'v', '0', '1'),
+
 	/*LASeR extension*/
 	GF_ISOM_BOX_TYPE_LSRC	= GF_4CC( 'l', 's', 'r', 'C' ),
 	GF_ISOM_BOX_TYPE_LSR1	= GF_4CC( 'l', 's', 'r', '1' ),
@@ -403,9 +406,9 @@ enum
 	/*ALL INTERNAL BOXES - NEVER WRITTEN TO FILE!!*/
 
 	/*generic handlers*/
-	GF_ISOM_BOX_TYPE_GNRM	= GF_4CC( 'g', 'n', 'r', 'm' ),
-	GF_ISOM_BOX_TYPE_GNRV	= GF_4CC( 'g', 'n', 'r', 'v' ),
-	GF_ISOM_BOX_TYPE_GNRA	= GF_4CC( 'g', 'n', 'r', 'a' ),
+	GF_ISOM_BOX_TYPE_GNRM	= GF_4CC( 'G', 'N', 'R', 'M' ),
+	GF_ISOM_BOX_TYPE_GNRV	= GF_4CC( 'G', 'N', 'R', 'V' ),
+	GF_ISOM_BOX_TYPE_GNRA	= GF_4CC( 'G', 'N', 'R', 'A' ),
 	/*storage of AU fragments (for MPEG-4 visual resync marker (video packets), located in stbl.*/
 	GF_ISOM_BOX_TYPE_STSF	=  GF_4CC( 'S', 'T', 'S', 'F' ),
 	/*base constructor of all hint formats (currently only RTP uses it)*/
@@ -443,6 +446,7 @@ enum
 	/* from drm_sample.c */
 	GF_ISOM_BOX_TYPE_264B 	= GF_4CC('2','6','4','b'),
 	GF_ISOM_BOX_TYPE_265B 	= GF_4CC('2','6','5','b'),
+	GF_ISOM_BOX_TYPE_AV1B 	= GF_4CC('a','v','1','b'),
 
 	GF_ISOM_BOX_TYPE_AUXV 	= GF_4CC('A','U','X','V'),
 
@@ -1118,6 +1122,12 @@ typedef struct
 
 typedef struct
 {
+	GF_ISOM_FULL_BOX
+	GF_AV1Config *config;
+} GF_AV1ConfigurationBox;
+
+typedef struct
+{
 	GF_ISOM_BOX
 	GF_3GPConfig cfg;
 } GF_3GPPConfigBox;
@@ -1136,6 +1146,8 @@ typedef struct
 	/*hevc extension*/
 	GF_HEVCConfigurationBox *hevc_config;
 	GF_HEVCConfigurationBox *lhvc_config;
+	/*av1 extension*/
+	GF_AV1ConfigurationBox *av1_config;
 
 	/*ext descriptors*/
 	GF_MPEG4ExtensionDescriptorsBox *descr;
@@ -1942,6 +1954,8 @@ typedef struct
 	u32 def_sample_size;
 	u32 def_sample_flags;
 	GF_TrackBox *track;
+
+	GF_TrackFragmentRandomAccessBox *tfra;
 } GF_TrackExtendsBox;
 
 /*the TrackExtends contains default values for the track fragments*/
@@ -2631,6 +2645,11 @@ typedef struct
 	u8 SAP_type;
 } GF_SAPEntry;
 
+/*SAPEntry - 'sync' type*/
+typedef struct
+{
+	u8 NALU_type;
+} GF_SYNCEntry;
 
 /*Operating Points Information - 'oinf' type*/
 typedef struct
@@ -2811,11 +2830,11 @@ typedef struct __traf_mss_timeext_box
 GF_SampleEncryptionBox *gf_isom_create_piff_psec_box(u8 version, u32 flags, u32 AlgorithmID, u8 IV_size, bin128 KID);
 GF_SampleEncryptionBox * gf_isom_create_samp_enc_box(u8 version, u32 flags);
 
-void gf_isom_cenc_get_default_info_ex(GF_TrackBox *trak, u32 sampleDescriptionIndex, u32 *default_IsEncrypted, u8 *default_IV_size, bin128 *default_KID);
-void gf_isom_cenc_get_default_pattern_info_ex(GF_TrackBox *trak, u32 sampleDescriptionIndex, u8 *default_crypt_byte_block, u8 *default_skip_byte_block);
+void gf_isom_cenc_get_default_info_ex(GF_TrackBox *trak, u32 sampleDescriptionIndex, u32 *default_IsEncrypted, u8 *default_IV_size, bin128 *default_KID, u8 *constant_IV_size, bin128 *constant_IV, u8 *crypt_byte_block, u8 *skip_byte_block);
+
+
 #ifndef	GPAC_DISABLE_ISOM_FRAGMENTS
-GF_Err gf_isom_get_sample_cenc_info_ex(GF_TrackBox *trak, GF_TrackFragmentBox *traf, GF_SampleEncryptionBox *senc, u32 sample_number, u32 *IsEncrypted, u8 *IV_size, bin128 *KID,
-										u8 *crypt_byte_block, u8 *skip_byte_block, u8 *constant_IV_size, bin128 *constant_IV);
+GF_Err gf_isom_get_sample_cenc_info_ex(GF_TrackBox *trak, GF_TrackFragmentBox *traf, GF_SampleEncryptionBox *senc, u32 sample_number, u32 *IsEncrypted, u8 *IV_size, bin128 *KID, u8 *crypt_byte_block, u8 *skip_byte_block, u8 *constant_IV_size, bin128 *constant_IV);
 GF_Err senc_Parse(GF_BitStream *bs, GF_TrackBox *trak, GF_TrackFragmentBox *traf, GF_SampleEncryptionBox *ptr);
 #else
 GF_Err gf_isom_get_sample_cenc_info_ex(GF_TrackBox *trak, void *traf, uGF_SampleEncryptionBox *senc, 32 sample_number, u32 *IsEncrypted, u8 *IV_size, bin128 *KID,
@@ -3233,6 +3252,9 @@ struct __tag_isom {
 	/* 0: no moof found yet, 1: 1 moof found, 2: next moof found */
 	Bool single_moof_mode;
 	u32 single_moof_state;
+
+	/* optional mfra box used in write mode */
+	GF_MovieFragmentRandomAccessBox *mfra;
 #endif
 	GF_ProducerReferenceTimeBox *last_producer_ref_time;
 
@@ -3428,15 +3450,16 @@ GF_Err traf_AddBox(GF_Box *s, GF_Box *a);
 GF_Err AVC_HEVC_UpdateESD(GF_MPEGVisualSampleEntryBox *avc, GF_ESD *esd);
 void AVC_RewriteESDescriptorEx(GF_MPEGVisualSampleEntryBox *avc, GF_MediaBox *mdia);
 void AVC_RewriteESDescriptor(GF_MPEGVisualSampleEntryBox *avc);
-void HEVC_RewriteESDescriptorEx(GF_MPEGVisualSampleEntryBox *avc, GF_MediaBox *mdia);
-void HEVC_RewriteESDescriptor(GF_MPEGVisualSampleEntryBox *avc);
-
+void HEVC_RewriteESDescriptorEx(GF_MPEGVisualSampleEntryBox *hevc, GF_MediaBox *mdia);
+void HEVC_RewriteESDescriptor(GF_MPEGVisualSampleEntryBox *hevc);
+void AV1_RewriteESDescriptorEx(GF_MPEGVisualSampleEntryBox *av1, GF_MediaBox *mdia);
+void AV1_RewriteESDescriptor(GF_MPEGVisualSampleEntryBox *av1);
 GF_Err reftype_AddRefTrack(GF_TrackReferenceTypeBox *ref, u32 trackID, u16 *outRefIndex);
 GF_XMLBox *gf_isom_get_meta_xml(GF_ISOFile *file, Bool root_meta, u32 track_num, Bool *is_binary);
-Bool gf_isom_cenc_has_saiz_saio_track(GF_SampleTableBox *stbl);
+Bool gf_isom_cenc_has_saiz_saio_track(GF_SampleTableBox *stbl, u32 scheme_type);
 
 #ifndef GPAC_DISABLE_ISOM_FRAGMENTS
-Bool gf_isom_cenc_has_saiz_saio_traf(GF_TrackFragmentBox *traf);
+Bool gf_isom_cenc_has_saiz_saio_traf(GF_TrackFragmentBox *traf, u32 scheme_type);
 void gf_isom_cenc_set_saiz_saio(GF_SampleEncryptionBox *senc, GF_SampleTableBox *stbl, GF_TrackFragmentBox  *traf, u32 len);
 #endif
 void gf_isom_cenc_merge_saiz_saio(GF_SampleEncryptionBox *senc, GF_SampleTableBox *stbl, u64 offset, u32 len);
@@ -3700,7 +3723,8 @@ GF_GenericSubtitleSample *gf_isom_parse_generic_subtitle_sample_from_data(char *
 		char __ptype[5];\
 		strcpy(__ptype, gf_4cc_to_str(__parent->type) );\
 		GF_LOG(GF_LOG_WARNING, GF_LOG_CONTAINER, ("[iso file] extra box %s found in %s, deleting\n", gf_4cc_to_str(__abox->type), __ptype)); \
-		gf_isom_box_del(a);\
+		gf_isom_box_del(__abox);\
+		__abox=NULL;\
 		return GF_OK;\
 	}
 

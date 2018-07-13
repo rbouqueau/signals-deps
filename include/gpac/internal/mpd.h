@@ -95,6 +95,9 @@ typedef struct
 	char *URL;
 	char *service_location;
 	GF_MPD_ByteRange *byte_range;
+
+	//GPAC internal: redirection for that URL
+	char *redirection;
 } GF_MPD_BaseURL;
 
 typedef struct
@@ -244,6 +247,11 @@ typedef struct
 	Bool waiting_codec_reset;
 	// BOLA Utility
 	Double bola_v;
+
+	/*index of the next enhancement representation plus 1, 0 is reserved in case of the highest representation*/
+	u32 enhancement_rep_index_plus_one;
+
+	Bool broadcast_flag;
 } GF_DASH_RepresentationPlayback;
 
 typedef struct {
@@ -261,9 +269,6 @@ typedef struct {
 	GF_MPD_SegmentTemplate *segment_template;
 
 	GF_List *sub_representations;
-
-	/*index of the next enhancement representation plus 1, 0 is reserved in case of the highest representation*/
-	u32 enhancement_rep_index_plus_one;
 
 	/*GPAC playback implementation*/
 	GF_DASH_RepresentationPlayback playback;
@@ -431,6 +436,8 @@ typedef enum
 	GF_MPD_RESOLVE_URL_INDEX,
 	//same as GF_MPD_RESOLVE_URL_MEDIA but does not replace $Time$ and $Number$
 	GF_MPD_RESOLVE_URL_MEDIA_TEMPLATE,
+	//same as GF_MPD_RESOLVE_URL_MEDIA but does not use startNumber
+	GF_MPD_RESOLVE_URL_MEDIA_NOSTART,
 } GF_MPD_URLResolveType;
 
 /*resolves a URL based for a given segment, based on the MPD url, the type of resolution
@@ -474,6 +481,17 @@ Double gf_mpd_get_duration(GF_MPD *mpd);
 
 /*get the duration of media segments in seconds*/
 void gf_mpd_resolve_segment_duration(GF_MPD_Representation *rep, GF_MPD_AdaptationSet *set, GF_MPD_Period *period, u64 *out_duration, u32 *out_timescale, u64 *out_pts_offset, GF_MPD_SegmentTimeline **out_segment_timeline);
+
+
+typedef struct
+{
+	u32 sample_num;
+	u64 dts;
+	s64 cts;
+} GF_DASHCueInfo;
+
+GF_Err gf_mpd_load_cues(const char *cues_file, u32 stream_id, u32 *cues_timescale, Bool *use_edit_list, GF_DASHCueInfo **out_cues, u32 *nb_cues);
+
 
 #endif /*GPAC_DISABLE_CORE_TOOLS*/
 
